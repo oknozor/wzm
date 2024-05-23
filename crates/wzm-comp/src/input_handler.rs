@@ -13,10 +13,10 @@ use crate::backend::udev::UdevData;
 use smithay::backend::renderer::DebugFlags;
 
 use smithay::backend::input::{
-    self, Axis, AxisSource, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent,
+    self, Axis, AxisSource, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent
 };
 use smithay::desktop::{layer_map_for_output, WindowSurfaceType};
-use smithay::input::keyboard::{FilterResult};
+use smithay::input::keyboard::FilterResult;
 use smithay::input::pointer::{AxisFrame, ButtonEvent, MotionEvent};
 use smithay::output::Scale;
 use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1;
@@ -25,7 +25,7 @@ use smithay::utils::{Logical, Point, Serial, Transform, SERIAL_COUNTER as SCOUNT
 use smithay::wayland::compositor::with_states;
 use smithay::wayland::input_method::InputMethodSeat;
 use smithay::wayland::shell::wlr_layer::{
-    KeyboardInteractivity, Layer as WlrLayer, LayerSurfaceCachedState,
+    KeyboardInteractivity, Layer as WlrLayer, LayerSurfaceCachedState
 };
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceData;
 
@@ -41,19 +41,19 @@ use crate::state::Backend;
 use smithay::{
     backend::{
         input::{
-            Device, DeviceCapability, GestureBeginEvent, GestureEndEvent, GesturePinchUpdateEvent as _, GestureSwipeUpdateEvent as _, PointerMotionEvent, ProximityState, TabletToolButtonEvent, TabletToolEvent, TabletToolProximityEvent, TabletToolTipEvent, TabletToolTipState, TouchEvent,
-        }, session::Session,
+            Device, DeviceCapability, GestureBeginEvent, GestureEndEvent, GesturePinchUpdateEvent as _, GestureSwipeUpdateEvent as _, PointerMotionEvent, ProximityState, TabletToolButtonEvent, TabletToolEvent, TabletToolProximityEvent, TabletToolTipEvent, TabletToolTipState, TouchEvent
+        }, session::Session
     }, input::{
         pointer::{
-            GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent, GestureSwipeBeginEvent, GestureSwipeEndEvent, GestureSwipeUpdateEvent, RelativeMotionEvent,
-        }, touch::{DownEvent, UpEvent},
+            GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent, GestureSwipeBeginEvent, GestureSwipeEndEvent, GestureSwipeUpdateEvent, RelativeMotionEvent
+        }, touch::{DownEvent, UpEvent}
     }, reexports::wayland_server::DisplayHandle, wayland::{
-        pointer_constraints::{with_pointer_constraint, PointerConstraint}, seat::WaylandFocus, tablet_manager::{TabletDescriptor, TabletSeatTrait},
-    },
+        pointer_constraints::{with_pointer_constraint, PointerConstraint}, seat::WaylandFocus, tablet_manager::{TabletDescriptor, TabletSeatTrait}
+    }
 };
-use xkbcommon::xkb::keysyms::{KEY_XF86Switch_VT_1, KEY_XF86Switch_VT_12};
 use wzm_config::action::KeyAction;
 use wzm_config::keybinding::Action;
+use xkbcommon::xkb::keysyms::{KEY_XF86Switch_VT_1, KEY_XF86Switch_VT_12};
 
 impl<BackendData: Backend> WzmState<BackendData> {
     fn process_common_key_action(&mut self, action: KeyAction) {
@@ -76,9 +76,9 @@ impl<BackendData: Backend> WzmState<BackendData> {
                             .into_iter()
                             .chain(
                                 #[cfg(feature = "xwayland")]
-                                    self.xdisplay.map(|v| ("DISPLAY", format!(":{}", v))),
+                                self.xdisplay.map(|v| ("DISPLAY", format!(":{}", v))),
                                 #[cfg(not(feature = "xwayland"))]
-                                    None,
+                                None,
                             ),
                     )
                     .spawn()
@@ -181,7 +181,9 @@ impl<BackendData: Backend> WzmState<BackendData> {
                             mod_pressed = true;
                         }
 
-                        let action = app_state.config.keybindings
+                        let action = app_state
+                            .config
+                            .keybindings
                             .iter()
                             .find_map(|binding| binding.match_action(*modifiers, keysym))
                             .map(Action::into)
@@ -1333,4 +1335,3 @@ impl WzmState<UdevData> {
         }
     }
 }
-
