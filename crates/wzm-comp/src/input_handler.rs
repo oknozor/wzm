@@ -13,10 +13,10 @@ use crate::backend::udev::UdevData;
 use smithay::backend::renderer::DebugFlags;
 
 use smithay::backend::input::{
-    self, Axis, AxisSource, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent
+    self, Axis, AxisSource, Event, InputBackend, InputEvent, KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent,
 };
 use smithay::desktop::{layer_map_for_output, WindowSurfaceType};
-use smithay::input::keyboard::{keysyms as xkb, FilterResult, Keysym, ModifiersState};
+use smithay::input::keyboard::{FilterResult};
 use smithay::input::pointer::{AxisFrame, ButtonEvent, MotionEvent};
 use smithay::output::Scale;
 use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1;
@@ -24,9 +24,8 @@ use smithay::reexports::wayland_server::protocol::wl_pointer;
 use smithay::utils::{Logical, Point, Serial, Transform, SERIAL_COUNTER as SCOUNTER};
 use smithay::wayland::compositor::with_states;
 use smithay::wayland::input_method::InputMethodSeat;
-use smithay::wayland::keyboard_shortcuts_inhibit::KeyboardShortcutsInhibitorSeat;
 use smithay::wayland::shell::wlr_layer::{
-    KeyboardInteractivity, Layer as WlrLayer, LayerSurfaceCachedState
+    KeyboardInteractivity, Layer as WlrLayer, LayerSurfaceCachedState,
 };
 use smithay::wayland::shell::xdg::XdgToplevelSurfaceData;
 
@@ -42,17 +41,19 @@ use crate::state::Backend;
 use smithay::{
     backend::{
         input::{
-            Device, DeviceCapability, GestureBeginEvent, GestureEndEvent, GesturePinchUpdateEvent as _, GestureSwipeUpdateEvent as _, PointerMotionEvent, ProximityState, TabletToolButtonEvent, TabletToolEvent, TabletToolProximityEvent, TabletToolTipEvent, TabletToolTipState, TouchEvent
-        }, session::Session
+            Device, DeviceCapability, GestureBeginEvent, GestureEndEvent, GesturePinchUpdateEvent as _, GestureSwipeUpdateEvent as _, PointerMotionEvent, ProximityState, TabletToolButtonEvent, TabletToolEvent, TabletToolProximityEvent, TabletToolTipEvent, TabletToolTipState, TouchEvent,
+        }, session::Session,
     }, input::{
         pointer::{
-            GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent, GestureSwipeBeginEvent, GestureSwipeEndEvent, GestureSwipeUpdateEvent, RelativeMotionEvent
-        }, touch::{DownEvent, UpEvent}
+            GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent, GesturePinchEndEvent, GesturePinchUpdateEvent, GestureSwipeBeginEvent, GestureSwipeEndEvent, GestureSwipeUpdateEvent, RelativeMotionEvent,
+        }, touch::{DownEvent, UpEvent},
     }, reexports::wayland_server::DisplayHandle, wayland::{
-        pointer_constraints::{with_pointer_constraint, PointerConstraint}, seat::WaylandFocus, tablet_manager::{TabletDescriptor, TabletSeatTrait}
-    }
+        pointer_constraints::{with_pointer_constraint, PointerConstraint}, seat::WaylandFocus, tablet_manager::{TabletDescriptor, TabletSeatTrait},
+    },
 };
+use xkbcommon::xkb::keysyms::{KEY_XF86Switch_VT_1, KEY_XF86Switch_VT_12};
 use wzm_config::action::KeyAction;
+use wzm_config::keybinding::Action;
 
 impl<BackendData: Backend> WzmState<BackendData> {
     fn process_common_key_action(&mut self, action: KeyAction) {
@@ -75,9 +76,9 @@ impl<BackendData: Backend> WzmState<BackendData> {
                             .into_iter()
                             .chain(
                                 #[cfg(feature = "xwayland")]
-                                self.xdisplay.map(|v| ("DISPLAY", format!(":{}", v))),
+                                    self.xdisplay.map(|v| ("DISPLAY", format!(":{}", v))),
                                 #[cfg(not(feature = "xwayland"))]
-                                None,
+                                    None,
                             ),
                     )
                     .spawn()
@@ -138,6 +139,7 @@ impl<BackendData: Backend> WzmState<BackendData> {
         debug!(keycode, ?state, "key");
         let serial = SCOUNTER.next_serial();
         let time = Event::time_msec(&evt);
+        // FIXME
         let mut suppressed_keys = self.suppressed_keys.clone();
         let keyboard = self.seat.get_keyboard().unwrap();
 
@@ -163,15 +165,7 @@ impl<BackendData: Backend> WzmState<BackendData> {
             }
         }
 
-        let inhibited = self
-            .space
-            .element_under(self.pointer.current_location())
-            .and_then(|(window, _)| {
-                let surface = window.wl_surface()?;
-                self.seat.keyboard_shortcuts_inhibitor_for_surface(&surface)
-            })
-            .map(|inhibitor| inhibitor.is_active())
-            .unwrap_or(false);
+        let mut mod_pressed = false;
 
         let action = keyboard
             .input(
@@ -180,48 +174,39 @@ impl<BackendData: Backend> WzmState<BackendData> {
                 state,
                 serial,
                 time,
-                |_, modifiers, handle| {
-                    let keysym = handle.modified_sym();
+                |app_state, modifiers, key_handle| {
+                    let keysym = key_handle.modified_sym();
+                    if state == KeyState::Pressed {
+                        if modifiers.alt {
+                            mod_pressed = true;
+                        }
 
-                    debug!(
-                        ?state,
-                        mods = ?modifiers,
-                        keysym = ::xkbcommon::xkb::keysym_get_name(keysym),
-                        "keysym"
-                    );
+                        let action = app_state.config.keybindings
+                            .iter()
+                            .find_map(|binding| binding.match_action(*modifiers, keysym))
+                            .map(Action::into)
+                            .map(FilterResult::Intercept);
 
-                    // If the key is pressed and triggered a action
-                    // we will not forward the key to the client.
-                    // Additionally add the key to the suppressed keys
-                    // so that we can decide on a release if the key
-                    // should be forwarded to the client or not.
-                    if let KeyState::Pressed = state {
-                        if !inhibited {
-                            let action = process_keyboard_shortcut(*modifiers, keysym);
-
-                            if action.is_some() {
-                                suppressed_keys.push(keysym);
-                            }
-
-                            action
-                                .map(FilterResult::Intercept)
-                                .unwrap_or(FilterResult::Forward)
-                        } else {
-                            FilterResult::Forward
+                        match action {
+                            None => match keysym.raw() {
+                                KEY_XF86Switch_VT_1..=KEY_XF86Switch_VT_12 => {
+                                    FilterResult::Intercept(KeyAction::VtSwitch(
+                                        (keysym.raw() - KEY_XF86Switch_VT_1 + 1) as i32,
+                                    ))
+                                }
+                                _ => FilterResult::Forward,
+                            },
+                            Some(action) => action,
                         }
                     } else {
-                        let suppressed = suppressed_keys.contains(&keysym);
-                        if suppressed {
-                            suppressed_keys.retain(|k| *k != keysym);
-                            FilterResult::Intercept(KeyAction::None)
-                        } else {
-                            FilterResult::Forward
-                        }
+                        mod_pressed = false;
+                        FilterResult::Forward
                     }
                 },
             )
             .unwrap_or(KeyAction::None);
 
+        self.mod_pressed = mod_pressed;
         self.suppressed_keys = suppressed_keys;
         action
     }
@@ -1349,36 +1334,3 @@ impl WzmState<UdevData> {
     }
 }
 
-fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
-    if modifiers.ctrl && modifiers.alt && keysym == Keysym::BackSpace
-        || modifiers.logo && keysym == Keysym::q
-    {
-        // ctrl+alt+backspace = quit
-        // logo + q = quit
-        Some(KeyAction::Quit)
-    } else if (xkb::KEY_XF86Switch_VT_1..=xkb::KEY_XF86Switch_VT_12).contains(&keysym.raw()) {
-        // VTSwitch
-        Some(KeyAction::VtSwitch(
-            (keysym.raw() - xkb::KEY_XF86Switch_VT_1 + 1) as i32,
-        ))
-    } else if modifiers.logo && keysym == Keysym::Return {
-        // run terminal
-        Some(KeyAction::Run("weston-terminal".into(), vec![]))
-    } else if modifiers.logo && (xkb::KEY_1..=xkb::KEY_9).contains(&keysym.raw()) {
-        Some(KeyAction::Screen((keysym.raw() - xkb::KEY_1) as usize))
-    } else if modifiers.logo && modifiers.shift && keysym == Keysym::M {
-        Some(KeyAction::ScaleDown)
-    } else if modifiers.logo && modifiers.shift && keysym == Keysym::P {
-        Some(KeyAction::ScaleUp)
-    } else if modifiers.logo && modifiers.shift && keysym == Keysym::W {
-        Some(KeyAction::TogglePreview)
-    } else if modifiers.logo && modifiers.shift && keysym == Keysym::R {
-        Some(KeyAction::RotateOutput)
-    } else if modifiers.logo && modifiers.shift && keysym == Keysym::T {
-        Some(KeyAction::ToggleTint)
-    } else if modifiers.logo && modifiers.shift && keysym == Keysym::D {
-        Some(KeyAction::ToggleDecorations)
-    } else {
-        None
-    }
-}

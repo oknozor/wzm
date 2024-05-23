@@ -10,13 +10,13 @@ pub mod action;
 pub mod keybinding;
 
 #[derive(Debug, Deserialize, Serialize)]
-pub struct WazemmesConfig {
+pub struct WzmConfig {
     pub gaps: u32,
     pub keybindings: Vec<KeyBinding>,
 }
 
-impl WazemmesConfig {
-    pub fn get() -> anyhow::Result<WazemmesConfig> {
+impl WzmConfig {
+    pub fn get() -> anyhow::Result<WzmConfig> {
         let file = dirs::home_dir()
             .expect("$HOME should be set")
             .join(".config/wazemmes/config.ron");
@@ -27,7 +27,7 @@ impl WazemmesConfig {
     }
 }
 
-impl Default for WazemmesConfig {
+impl Default for WzmConfig {
     fn default() -> Self {
         Self {
             gaps: 14,

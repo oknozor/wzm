@@ -170,7 +170,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::keybinding::{Action, KeyBinding, Modifier};
-    use crate::WazemmesConfig;
+    use crate::WzmConfig;
     use indoc::indoc;
     use smithay::input::keyboard::Keysym;
     use speculoos::prelude::*;
@@ -270,11 +270,12 @@ mod test {
             },
         ];
 
-        let config = WazemmesConfig {
+        let config = WzmConfig {
             gaps: 14,
             keybindings: binding,
         };
 
-        ron::to_string(&config).unwrap();
+        let string = ron::to_string(&config).unwrap();
+        println!("{}", string);
     }
 }

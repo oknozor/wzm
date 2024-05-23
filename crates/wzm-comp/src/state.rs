@@ -55,6 +55,7 @@ use crate::shell::WindowElement;
 use smithay::{
     delegate_xwayland_keyboard_grab, delegate_xwayland_shell, utils::{Point, Size}, wayland::selection::{SelectionSource, SelectionTarget}, wayland::xwayland_keyboard_grab::{XWaylandKeyboardGrabHandler, XWaylandKeyboardGrabState}, wayland::xwayland_shell, xwayland::{X11Wm, XWayland, XWaylandEvent}
 };
+use wzm_config::WzmConfig;
 
 #[derive(Debug, Default)]
 pub struct ClientState {
@@ -104,6 +105,7 @@ pub struct WzmState<BackendData: Backend + 'static> {
 
     // input-related fields
     pub suppressed_keys: Vec<Keysym>,
+    pub mod_pressed: bool,
     pub cursor_status: CursorImageStatus,
     pub seat_name: String,
     pub seat: Seat<WzmState<BackendData>>,
@@ -119,6 +121,7 @@ pub struct WzmState<BackendData: Backend + 'static> {
     pub renderdoc: Option<renderdoc::RenderDoc<renderdoc::V141>>,
 
     pub show_window_preview: bool,
+    pub config: WzmConfig,
 }
 
 delegate_compositor!(@<BackendData: Backend + 'static> WzmState<BackendData>);
@@ -622,6 +625,7 @@ impl<BackendData: Backend + 'static> WzmState<BackendData> {
             xdg_foreign_state,
             dnd_icon: None,
             suppressed_keys: Vec::new(),
+            mod_pressed: false,
             cursor_status: CursorImageStatus::default_named(),
             seat_name,
             seat,
@@ -637,6 +641,7 @@ impl<BackendData: Backend + 'static> WzmState<BackendData> {
             #[cfg(feature = "debug")]
             renderdoc: renderdoc::RenderDoc::new().ok(),
             show_window_preview: false,
+            config: WzmConfig::get().expect("Failed to get config"),
         }
     }
 
