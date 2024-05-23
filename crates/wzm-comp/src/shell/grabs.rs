@@ -398,12 +398,12 @@ impl<BackendData: Backend> PointerGrab<WzmState<BackendData>>
         let min_width = min_size.w.max(1);
         let min_height = min_size.h.max(1);
         let max_width = if max_size.w == 0 {
-            i32::max_value()
+            i32::MAX
         } else {
             max_size.w
         };
         let max_height = if max_size.h == 0 {
-            i32::max_value()
+            i32::MAX
         } else {
             max_size.h
         };
@@ -815,12 +815,12 @@ impl<BackendData: Backend> TouchGrab<WzmState<BackendData>>
         let min_width = min_size.w.max(1);
         let min_height = min_size.h.max(1);
         let max_width = if max_size.w == 0 {
-            i32::max_value()
+            i32::MAX
         } else {
             max_size.w
         };
         let max_height = if max_size.h == 0 {
-            i32::max_value()
+            i32::MAX
         } else {
             max_size.h
         };

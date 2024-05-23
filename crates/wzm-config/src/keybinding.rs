@@ -45,15 +45,15 @@ fn match_modifier(modifier: ModifiersState, other: ModifiersState) -> bool {
     )
 }
 
-impl Into<ModifiersState> for &KeyBinding {
-    fn into(self) -> ModifiersState {
+impl From<&KeyBinding> for ModifiersState {
+    fn from(val: &KeyBinding) -> Self {
         ModifiersState {
-            ctrl: self.modifiers.contains(&Modifier::Ctrl),
-            alt: self.modifiers.contains(&Modifier::Alt),
-            shift: self.modifiers.contains(&Modifier::Shift),
-            caps_lock: self.modifiers.contains(&Modifier::CapsLock),
-            logo: self.modifiers.contains(&Modifier::Logo),
-            num_lock: self.modifiers.contains(&Modifier::NumLock),
+            ctrl: val.modifiers.contains(&Modifier::Ctrl),
+            alt: val.modifiers.contains(&Modifier::Alt),
+            shift: val.modifiers.contains(&Modifier::Shift),
+            caps_lock: val.modifiers.contains(&Modifier::CapsLock),
+            logo: val.modifiers.contains(&Modifier::Logo),
+            num_lock: val.modifiers.contains(&Modifier::NumLock),
             iso_level3_shift: false,
             serialized: Default::default(),
         }
@@ -88,9 +88,9 @@ pub enum Action {
     Quit,
 }
 
-impl Into<KeyAction> for Action {
-    fn into(self) -> KeyAction {
-        match self {
+impl From<Action> for KeyAction {
+    fn from(val: Action) -> Self {
+        match val {
             Action::MoveWindowLeft => KeyAction::MoveWindow(Direction::Left),
             Action::MoveWindowRight => KeyAction::MoveWindow(Direction::Right),
             Action::MoveWindowDown => KeyAction::MoveWindow(Direction::Down),
@@ -189,7 +189,7 @@ mod test {
             )"#
         };
 
-        let binding = ron::from_str::<KeyBinding>(&keys);
+        let binding = ron::from_str::<KeyBinding>(keys);
 
         assert_that!(binding).is_ok();
         let binding = binding.unwrap();
