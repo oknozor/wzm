@@ -38,17 +38,17 @@ fn main() {
         #[cfg(feature = "winit")]
         Some("--winit") => {
             tracing::info!("Starting wzm with winit backend");
-            wzm::winit::run_winit();
+            wzm_comp::backend::winit::run_winit();
         }
         #[cfg(feature = "udev")]
         Some("--tty-udev") => {
             tracing::info!("Starting wzm on a tty using udev");
-            wzm::udev::run_udev();
+            wzm_comp::backend::udev::run_udev();
         }
         #[cfg(feature = "x11")]
         Some("--x11") => {
             tracing::info!("Starting wzm with x11 backend");
-            wzm::x11::run_x11();
+            wzm_comp::backend::x11::run_x11();
         }
         Some(other) => {
             tracing::error!("Unknown backend: {}", other);

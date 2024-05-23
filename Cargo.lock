@@ -2771,6 +2771,17 @@ dependencies = [
 name = "wzm"
 version = "0.1.0"
 dependencies = [
+ "profiling",
+ "puffin_http",
+ "tracing",
+ "tracing-subscriber",
+ "wzm-comp",
+]
+
+[[package]]
+name = "wzm-comp"
+version = "0.1.0"
+dependencies = [
  "bitflags 2.5.0",
  "fps_ticker",
  "gl_generator",
@@ -2783,7 +2794,6 @@ dependencies = [
  "smithay-drm-extras",
  "thiserror",
  "tracing",
- "tracing-subscriber",
  "wzm-config",
  "x11rb",
  "xcursor",

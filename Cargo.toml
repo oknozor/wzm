@@ -4,6 +4,7 @@ resolver = "2"
 
 [workspace.dependencies]
 wzm-config = { path = "crates/wzm-config" }
+wzm-comp = { path = "crates/wzm-comp" }
 
 [workspace.dependencies.smithay]
 default-features = false
