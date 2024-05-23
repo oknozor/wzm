@@ -51,6 +51,7 @@ use smithay::{
         pointer_constraints::{with_pointer_constraint, PointerConstraint}, seat::WaylandFocus, tablet_manager::{TabletDescriptor, TabletSeatTrait}
     }
 };
+use wzm_config::action::KeyAction;
 
 impl<BackendData: Backend> WzmState<BackendData> {
     fn process_common_key_action(&mut self, action: KeyAction) {
@@ -62,7 +63,7 @@ impl<BackendData: Backend> WzmState<BackendData> {
                 self.running.store(false, Ordering::SeqCst);
             }
 
-            KeyAction::Run(cmd) => {
+            KeyAction::Run(cmd, _env) => {
                 info!(cmd, "Starting program");
 
                 if let Err(e) = Command::new(&cmd)
@@ -527,7 +528,7 @@ impl<Backend: crate::state::Backend> WzmState<Backend> {
                 action => match action {
                     KeyAction::None
                     | KeyAction::Quit
-                    | KeyAction::Run(_)
+                    | KeyAction::Run(_, _)
                     | KeyAction::TogglePreview
                     | KeyAction::ToggleDecorations => self.process_common_key_action(action),
 
@@ -761,7 +762,7 @@ impl WzmState<UdevData> {
                 action => match action {
                     KeyAction::None
                     | KeyAction::Quit
-                    | KeyAction::Run(_)
+                    | KeyAction::Run(_, _)
                     | KeyAction::TogglePreview
                     | KeyAction::ToggleDecorations => self.process_common_key_action(action),
 
@@ -1347,28 +1348,6 @@ impl WzmState<UdevData> {
     }
 }
 
-/// Possible results of a keyboard action
-#[allow(dead_code)] // some of these are only read if udev is enabled
-#[derive(Debug)]
-enum KeyAction {
-    /// Quit the compositor
-    Quit,
-    /// Trigger a vt-switch
-    VtSwitch(i32),
-    /// run a command
-    Run(String),
-    /// Switch the current screen
-    Screen(usize),
-    ScaleUp,
-    ScaleDown,
-    TogglePreview,
-    RotateOutput,
-    ToggleTint,
-    ToggleDecorations,
-    /// Do nothing more
-    None,
-}
-
 fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Option<KeyAction> {
     if modifiers.ctrl && modifiers.alt && keysym == Keysym::BackSpace
         || modifiers.logo && keysym == Keysym::q
@@ -1383,7 +1362,7 @@ fn process_keyboard_shortcut(modifiers: ModifiersState, keysym: Keysym) -> Optio
         ))
     } else if modifiers.logo && keysym == Keysym::Return {
         // run terminal
-        Some(KeyAction::Run("weston-terminal".into()))
+        Some(KeyAction::Run("weston-terminal".into(), vec![]))
     } else if modifiers.logo && (xkb::KEY_1..=xkb::KEY_9).contains(&keysym.raw()) {
         Some(KeyAction::Screen((keysym.raw() - xkb::KEY_1) as usize))
     } else if modifiers.logo && modifiers.shift && keysym == Keysym::M {

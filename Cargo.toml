@@ -1,3 +1,13 @@
 [workspace]
 members = ["crates/*"]
 resolver = "2"
+
+[workspace.dependencies]
+wzm-config = { path = "crates/wzm-config" }
+
+[workspace.dependencies.smithay]
+default-features = false
+git = "https://github.com/stratawm/smithay"
+version = "0.3.0"
+rev = "8f132ec"
+features = ["desktop", "wayland_frontend"]
