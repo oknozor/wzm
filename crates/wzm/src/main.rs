@@ -1,68 +1,44 @@
-static POSSIBLE_BACKENDS: &[&str] = &[
-    #[cfg(feature = "winit")]
-    "--winit : Run wzm as a X11 or Wayland client using winit.",
-    #[cfg(feature = "udev")]
-    "--tty-udev : Run wzm as a tty udev client (requires root if without logind).",
-    #[cfg(feature = "x11")]
-    "--x11 : Run wzm as an X11 client.",
-];
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+use wzm_comp::{winit, CalloopData, Display, EventLoop, Wzm};
 
-#[cfg(feature = "profile-with-tracy-mem")]
-#[global_allocator]
-static GLOBAL: profiling::tracy_client::ProfiledAllocator<std::alloc::System> =
-    profiling::tracy_client::ProfiledAllocator::new(std::alloc::System, 10);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::registry()
+        .with(tracing_subscriber::EnvFilter::new(
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "wzm=debug,wzm_comp=debug".into()),
+        ))
+        .with(tracing_subscriber::fmt::layer())
+        .init();
 
-fn main() {
-    if let Ok(env_filter) = tracing_subscriber::EnvFilter::try_from_default_env() {
-        tracing_subscriber::fmt()
-            .compact()
-            .with_env_filter(env_filter)
-            .init();
-    } else {
-        tracing_subscriber::fmt().compact().init();
-    }
+    let mut event_loop: EventLoop<CalloopData> = EventLoop::try_new()?;
 
-    #[cfg(feature = "profile-with-tracy")]
-    profiling::tracy_client::Client::start();
+    let display: Display<Wzm> = Display::new()?;
+    let display_handle = display.handle();
+    let state = Wzm::new(&mut event_loop, display);
 
-    profiling::register_thread!("Main Thread");
+    let mut data = CalloopData {
+        state,
+        display_handle: display_handle.clone(),
+    };
 
-    #[cfg(feature = "profile-with-puffin")]
-    let _server =
-        puffin_http::Server::new(&format!("0.0.0.0:{}", puffin_http::DEFAULT_PORT)).unwrap();
-    #[cfg(feature = "profile-with-puffin")]
-    profiling::puffin::set_scopes_on(true);
+    winit::init_winit(&mut event_loop, &mut data.state, display_handle)?;
 
-    let arg = ::std::env::args().nth(1);
-    match arg.as_ref().map(|s| &s[..]) {
-        #[cfg(feature = "winit")]
-        Some("--winit") => {
-            tracing::info!("Starting wzm with winit backend");
-            wzm_comp::backend::winit::run_winit();
+    let mut args = std::env::args().skip(1);
+    let flag = args.next();
+    let arg = args.next();
+
+    match (flag.as_deref(), arg) {
+        (Some("-c") | Some("--command"), Some(command)) => {
+            std::process::Command::new(command).spawn().ok();
         }
-        #[cfg(feature = "udev")]
-        Some("--tty-udev") => {
-            tracing::info!("Starting wzm on a tty using udev");
-            wzm_comp::backend::udev::run_udev();
-        }
-        #[cfg(feature = "x11")]
-        Some("--x11") => {
-            tracing::info!("Starting wzm with x11 backend");
-            wzm_comp::backend::x11::run_x11();
-        }
-        Some(other) => {
-            tracing::error!("Unknown backend: {}", other);
-        }
-        None => {
-            #[allow(clippy::disallowed_macros)]
-            {
-                println!("USAGE: wzm --backend");
-                println!();
-                println!("Possible backends are:");
-                for b in POSSIBLE_BACKENDS {
-                    println!("\t{}", b);
-                }
-            }
+        _ => {
+            std::process::Command::new("weston-terminal").spawn().ok();
         }
     }
+
+    event_loop.run(None, &mut data, move |_| {
+        // Smallvil is running
+    })?;
+
+    Ok(())
 }

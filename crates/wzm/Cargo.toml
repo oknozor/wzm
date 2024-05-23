@@ -9,14 +9,3 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 tracing = { version = "0.1.37", features = ["max_level_trace", "release_max_level_debug"] }
 puffin_http = { version = "0.13", optional = true }
 profiling = { version = "1.0" }
-
-[features]
-default = ["egl", "winit", "x11", "udev", "xwayland"]
-egl = ["wzm-comp/egl"]
-udev = ["wzm-comp/udev"]
-winit = ["wzm-comp/winit"]
-x11 = ["wzm-comp/x11"]
-xwayland = ["wzm-comp/xwayland"]
-profile-with-puffin = ["wzm-comp/profile-with-puffin"]
-profile-with-tracy = ["wzm-comp/profile-with-tracy"]
-profile-with-tracy-mem = ["wzm-comp/profile-with-tracy-mem"]

@@ -1,5 +1,0 @@
-imports_layout = "Horizontal"
-imports_indent = "Block"
-imports_granularity = "Module"
-reorder_imports = true
-unstable_features = true

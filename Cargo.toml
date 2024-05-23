@@ -11,4 +11,4 @@ default-features = false
 git = "https://github.com/stratawm/smithay"
 version = "0.3.0"
 rev = "8f132ec"
-features = ["desktop", "wayland_frontend"]
+features = ["desktop", "wayland_frontend", "backend_winit", "backend_egl", "use_system_lib"]
