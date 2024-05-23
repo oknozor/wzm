@@ -1,19 +1,18 @@
+use std::cell::RefCell;
 use smithay::delegate_xdg_shell;
 use smithay::desktop::{
     find_popup_root_surface, get_popup_toplevel_coords, PopupKind, PopupManager, Space, Window,
 };
 use smithay::input::pointer::{Focus, GrabStartData as PointerGrabStartData};
 use smithay::input::Seat;
+use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode;
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
-use smithay::reexports::wayland_server::protocol::wl_seat;
+use smithay::reexports::wayland_server::protocol::{wl_seat, wl_surface};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::Resource;
 use smithay::utils::{Rectangle, Serial, SERIAL_COUNTER};
-use smithay::wayland::compositor::with_states;
-use smithay::wayland::shell::xdg::{
-    PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler,
-    XdgShellState, XdgToplevelSurfaceData,
-};
+use smithay::wayland::compositor::{SurfaceData, with_states};
+use smithay::wayland::shell::xdg::{PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler, XdgShellState, XdgToplevelSurfaceData};
 use tracing::debug;
 
 use crate::grabs::{MoveSurfaceGrab, ResizeSurfaceGrab};
@@ -27,6 +26,7 @@ impl XdgShellHandler for Wzm {
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let workspace = self.get_current_workspace();
         let mut workspace = workspace.get_mut();
+
         debug!("New toplevel window");
         {
             let container = if let Some(layout) = self.next_layout {
@@ -56,21 +56,6 @@ impl XdgShellHandler for Wzm {
     fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {
         self.unconstrain_popup(&surface);
         let _ = self.popups.track_popup(PopupKind::Xdg(surface));
-    }
-
-    fn reposition_request(
-        &mut self,
-        surface: PopupSurface,
-        positioner: PositionerState,
-        token: u32,
-    ) {
-        surface.with_pending_state(|state| {
-            let geometry = positioner.get_geometry();
-            state.geometry = geometry;
-            state.positioner = positioner;
-        });
-        self.unconstrain_popup(&surface);
-        surface.send_repositioned(token);
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
@@ -141,6 +126,21 @@ impl XdgShellHandler for Wzm {
 
     fn grab(&mut self, _surface: PopupSurface, _seat: wl_seat::WlSeat, _serial: Serial) {
         // TODO popup grabs
+    }
+
+    fn reposition_request(
+        &mut self,
+        surface: PopupSurface,
+        positioner: PositionerState,
+        token: u32,
+    ) {
+        surface.with_pending_state(|state| {
+            let geometry = positioner.get_geometry();
+            state.geometry = geometry;
+            state.positioner = positioner;
+        });
+        self.unconstrain_popup(&surface);
+        surface.send_repositioned(token);
     }
 }
 

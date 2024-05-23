@@ -13,6 +13,7 @@ use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{CompositorClientState, CompositorState};
 use smithay::wayland::output::OutputManagerState;
 use smithay::wayland::selection::data_device::DataDeviceState;
+use smithay::wayland::shell::xdg::decoration::XdgDecorationState;
 use smithay::wayland::shell::xdg::XdgShellState;
 use smithay::wayland::shm::ShmState;
 use smithay::wayland::socket::ListeningSocketSource;
@@ -38,6 +39,7 @@ pub struct Wzm {
     pub seat_state: SeatState<Wzm>,
     pub data_device_state: DataDeviceState,
     pub popups: PopupManager,
+    pub xdg_decoration_state: XdgDecorationState,
 
     pub seat: Seat<Self>,
     pub config: WzmConfig,
@@ -62,6 +64,7 @@ impl Wzm {
         let mut seat_state = SeatState::new();
         let data_device_state = DataDeviceState::new::<Self>(&dh);
         let popups = PopupManager::default();
+        let xdg_decoration_state = XdgDecorationState::new::<Wzm>(&dh);
 
         // A seat is a group of keyboards, pointer and touch devices.
         // A seat typically has a pointer and maintains a keyboard focus and a pointer focus.
@@ -98,6 +101,7 @@ impl Wzm {
             seat_state,
             data_device_state,
             popups,
+            xdg_decoration_state,
             seat,
             config: WzmConfig::get().expect("failed to get config"),
             mod_pressed: false,

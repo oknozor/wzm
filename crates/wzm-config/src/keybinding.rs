@@ -19,6 +19,7 @@ pub struct KeyBinding {
 impl KeyBinding {
     pub fn match_action(&self, modifiers: ModifiersState, key: Keysym) -> Option<Action> {
         let state: ModifiersState = self.into();
+
         if match_modifier(state, modifiers) && key == self.key {
             Some(self.action.clone())
         } else {

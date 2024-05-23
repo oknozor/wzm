@@ -28,7 +28,6 @@ impl Wzm {
                 KeyAction::Screen(_) => {}
                 KeyAction::ToggleTint => {}
                 KeyAction::TogglePreview => {}
-                KeyAction::ToggleDecorations => {}
                 KeyAction::ToggleFullScreenWindow => {}
                 KeyAction::ToggleFullScreenContainer => {}
                 KeyAction::MoveWindow(_) => {}
@@ -159,7 +158,6 @@ impl Wzm {
     fn keyboard_key_to_action<B: InputBackend>(&mut self, evt: B::KeyboardKeyEvent) -> KeyAction {
         let keycode = evt.key_code();
         let state = evt.state();
-        debug!(keycode, ?state, "key");
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
         let keyboard = self.seat.get_keyboard().unwrap();

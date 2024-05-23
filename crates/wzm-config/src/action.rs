@@ -6,7 +6,6 @@ pub enum KeyAction {
     Screen(usize),
     ToggleTint,
     TogglePreview,
-    ToggleDecorations,
     ToggleFullScreenWindow,
     ToggleFullScreenContainer,
     MoveWindow(Direction),

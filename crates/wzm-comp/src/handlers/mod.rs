@@ -12,6 +12,7 @@ use smithay::{delegate_data_device, delegate_output, delegate_seat};
 use crate::Wzm;
 
 mod compositor;
+mod decoration;
 mod xdg_shell;
 //
 // Wl Seat
