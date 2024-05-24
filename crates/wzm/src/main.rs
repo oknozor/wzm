@@ -1,6 +1,9 @@
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use wzm_comp::{winit, CalloopData, Display, EventLoop, Wzm};
+use wzm_comp::backend::winit::Winit;
+use wzm_comp::backend::Backend;
+use wzm_comp::{CalloopData, Display, EventLoop, Wzm};
+use wzm_config::WzmConfig;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::registry()
@@ -11,34 +14,32 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     let mut event_loop: EventLoop<CalloopData> = EventLoop::try_new()?;
-
+    let loop_signal = event_loop.get_signal();
+    let event_loop_handle = event_loop.handle();
     let display: Display<Wzm> = Display::new()?;
-    let display_handle = display.handle();
-    let state = Wzm::new(&mut event_loop, display);
+    let winit = Winit::new(event_loop_handle.clone(), display.handle()).unwrap();
+    let state = Wzm::new(event_loop_handle, display, winit.output());
 
     let mut data = CalloopData {
-        state,
-        display_handle: display_handle.clone(),
+        wzm: state,
+        config: WzmConfig::get().unwrap(),
+        backend: Backend::Winit(winit),
+        loop_signal,
     };
 
-    winit::init_winit(&mut event_loop, &mut data.state, display_handle)?;
+    data.backend.init(&mut data.wzm);
+    data.start_compositor();
 
-    let mut args = std::env::args().skip(1);
-    let flag = args.next();
-    let arg = args.next();
-
-    match (flag.as_deref(), arg) {
-        (Some("-c") | Some("--command"), Some(command)) => {
-            std::process::Command::new(command).spawn().ok();
-        }
-        _ => {
-            std::process::Command::new("weston-terminal").spawn().ok();
-        }
-    }
-
-    event_loop.run(None, &mut data, move |_| {
-        // Smallvil is running
-    })?;
+    event_loop
+        .run(None, &mut data, |state| {
+            let ws = state.wzm.get_current_workspace();
+            let mut ws = ws.get_mut();
+            if ws.needs_redraw {
+                ws.update_layout(&state.wzm.space);
+                ws.redraw(&mut state.wzm.space);
+            }
+        })
+        .unwrap();
 
     Ok(())
 }

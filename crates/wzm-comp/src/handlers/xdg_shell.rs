@@ -1,18 +1,19 @@
-use std::cell::RefCell;
 use smithay::delegate_xdg_shell;
 use smithay::desktop::{
     find_popup_root_surface, get_popup_toplevel_coords, PopupKind, PopupManager, Space, Window,
 };
 use smithay::input::pointer::{Focus, GrabStartData as PointerGrabStartData};
 use smithay::input::Seat;
-use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_toplevel_decoration_v1::Mode;
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
-use smithay::reexports::wayland_server::protocol::{wl_seat, wl_surface};
+use smithay::reexports::wayland_server::protocol::wl_seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::Resource;
 use smithay::utils::{Rectangle, Serial, SERIAL_COUNTER};
-use smithay::wayland::compositor::{SurfaceData, with_states};
-use smithay::wayland::shell::xdg::{PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler, XdgShellState, XdgToplevelSurfaceData};
+use smithay::wayland::compositor::with_states;
+use smithay::wayland::shell::xdg::{
+    PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler,
+    XdgShellState, XdgToplevelSurfaceData,
+};
 use tracing::debug;
 
 use crate::grabs::{MoveSurfaceGrab, ResizeSurfaceGrab};
@@ -24,33 +25,33 @@ impl XdgShellHandler for Wzm {
     }
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
+        debug!("New toplevel window");
         let workspace = self.get_current_workspace();
         let mut workspace = workspace.get_mut();
+        debug!("new toplevel, mutable ref for WS");
 
-        debug!("New toplevel window");
+        let container = if let Some(layout) = self.next_layout {
+            self.next_layout = None;
+            workspace.create_container(layout)
+        } else {
+            workspace.get_focus().0
+        };
+
         {
-            let container = if let Some(layout) = self.next_layout {
-                self.next_layout = None;
-                workspace.create_container(layout)
-            } else {
-                workspace.get_focus().0
-            };
-
-            {
-                let mut container = container.get_mut();
-                container.push_toplevel(surface.clone());
-            }
-
-            // Grab keyboard focus
-            let handle = self
-                .seat
-                .get_keyboard()
-                .expect("Should have a keyboard seat");
-
-            let serial = SERIAL_COUNTER.next_serial();
-            handle.set_focus(self, Some(surface.wl_surface().clone()), serial);
-            workspace.needs_redraw = true;
+            let mut container = container.get_mut();
+            container.push_toplevel(surface.clone());
         }
+
+        // Grab keyboard focus
+        let handle = self
+            .seat
+            .get_keyboard()
+            .expect("Should have a keyboard seat");
+
+        let serial = SERIAL_COUNTER.next_serial();
+        handle.set_focus(self, Some(surface.wl_surface().clone()), serial);
+        workspace.needs_redraw = true;
+        debug!("new toplevel, dropped mutable ref for WS");
     }
 
     fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {

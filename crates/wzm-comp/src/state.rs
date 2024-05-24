@@ -4,8 +4,9 @@ use std::sync::Arc;
 
 use smithay::desktop::{PopupManager, Space, Window, WindowSurfaceType};
 use smithay::input::{Seat, SeatState};
+use smithay::output::Output;
 use smithay::reexports::calloop::generic::Generic;
-use smithay::reexports::calloop::{EventLoop, Interest, LoopSignal, Mode, PostAction};
+use smithay::reexports::calloop::{Interest, LoopHandle, Mode, PostAction};
 use smithay::reexports::wayland_server::backend::{ClientData, ClientId, DisconnectReason};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::{Display, DisplayHandle};
@@ -17,6 +18,7 @@ use smithay::wayland::shell::xdg::decoration::XdgDecorationState;
 use smithay::wayland::shell::xdg::XdgShellState;
 use smithay::wayland::shm::ShmState;
 use smithay::wayland::socket::ListeningSocketSource;
+
 use wzm_config::WzmConfig;
 
 use crate::shell::container::ContainerLayout;
@@ -27,10 +29,7 @@ pub struct Wzm {
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
     pub display_handle: DisplayHandle,
-
     pub space: Space<Window>,
-    pub loop_signal: LoopSignal,
-
     // Smithay State
     pub compositor_state: CompositorState,
     pub xdg_shell_state: XdgShellState,
@@ -40,8 +39,8 @@ pub struct Wzm {
     pub data_device_state: DataDeviceState,
     pub popups: PopupManager,
     pub xdg_decoration_state: XdgDecorationState,
-
     pub seat: Seat<Self>,
+    // We should use this in calloopdata, not wazm
     pub config: WzmConfig,
 
     // Shell
@@ -52,7 +51,11 @@ pub struct Wzm {
 }
 
 impl Wzm {
-    pub fn new(event_loop: &mut EventLoop<CalloopData>, display: Display<Self>) -> Self {
+    pub fn new(
+        event_loop: LoopHandle<CalloopData>,
+        display: Display<Self>,
+        output: &Output,
+    ) -> Self {
         let start_time = std::time::Instant::now();
 
         let dh = display.handle();
@@ -82,17 +85,14 @@ impl Wzm {
         //
         // Windows get a position and stacking order through mapping.
         // Outputs become views of a part of the Space and can be rendered via Space::render_output.
-        let space = Space::default();
+        let mut space = Space::default();
         let socket_name = Self::init_wayland_listener(display, event_loop);
-
-        // Get the loop signal, used to stop the event loop
-        let loop_signal = event_loop.get_signal();
+        space.map_output(output, (0, 0));
 
         Self {
             start_time,
             display_handle: dh,
             space,
-            loop_signal,
             socket_name,
             compositor_state,
             xdg_shell_state,
@@ -113,7 +113,7 @@ impl Wzm {
 
     fn init_wayland_listener(
         display: Display<Wzm>,
-        event_loop: &mut EventLoop<CalloopData>,
+        event_loop: LoopHandle<CalloopData>,
     ) -> OsString {
         // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
         let listening_socket = ListeningSocketSource::new_auto().unwrap();
@@ -122,15 +122,13 @@ impl Wzm {
         // Clients will connect to this socket.
         let socket_name = listening_socket.socket_name().to_os_string();
 
-        let handle = event_loop.handle();
-
         event_loop
-            .handle()
             .insert_source(listening_socket, move |client_stream, _, state| {
                 // Inside the callback, you should insert the client into the display.
                 //
                 // You may also associate some data with the client when inserting the client.
                 state
+                    .wzm
                     .display_handle
                     .insert_client(client_stream, Arc::new(ClientState::default()))
                     .unwrap();
@@ -138,16 +136,13 @@ impl Wzm {
             .expect("Failed to init the wayland event source.");
 
         // You also need to add the display itself to the event loop, so that client events will be processed by wayland-server.
-        handle
+        event_loop
             .insert_source(
                 Generic::new(display, Interest::READ, Mode::Level),
                 |_, display, state| {
                     // Safety: we don't drop the display
                     unsafe {
-                        display
-                            .get_mut()
-                            .dispatch_clients(&mut state.state)
-                            .unwrap();
+                        display.get_mut().dispatch_clients(&mut state.wzm).unwrap();
                     }
                     Ok(PostAction::Continue)
                 },

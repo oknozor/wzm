@@ -1,3 +1,5 @@
+use smithay::utils::{Logical, Point};
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum KeyAction {
     ScaleUp,
@@ -28,4 +30,15 @@ pub enum Direction {
     Right,
     Up,
     Down,
+}
+
+impl Direction {
+    pub fn advance_point(&self, p: &mut Point<f64, Logical>) {
+        match self {
+            Direction::Left => p.x -= 1.0,
+            Direction::Right => p.x += 1.0,
+            Direction::Up => p.y -= 1.0,
+            Direction::Down => p.y += 1.0,
+        }
+    }
 }

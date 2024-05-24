@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 wzm-comp.workspace = true
+wzm-config.workspace = true
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 tracing = { version = "0.1.37", features = ["max_level_trace", "release_max_level_debug"] }
 puffin_http = { version = "0.13", optional = true }

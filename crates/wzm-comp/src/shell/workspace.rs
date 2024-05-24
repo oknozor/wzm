@@ -39,7 +39,7 @@ pub struct Workspace {
     pub fullscreen_layer: Option<Node>,
     root: ContainerRef,
     focus: ContainerRef,
-    pub(crate) needs_redraw: bool,
+    pub needs_redraw: bool,
     pub borders: Vec<Borders>,
     pub gaps: i32,
 }
