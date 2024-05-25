@@ -32,6 +32,7 @@ impl XdgShellHandler for Wzm {
 
         let container = if let Some(layout) = self.next_layout {
             self.next_layout = None;
+            debug!("Creating a new {layout:?} container");
             workspace.create_container(layout)
         } else {
             workspace.get_focus().0

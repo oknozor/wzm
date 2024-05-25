@@ -646,6 +646,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "glow"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ca0fe580e4b60a8ab24a868bc08e2f03cbcb20d3d676601fa909386713333728"
+dependencies = [
+ "js-sys",
+ "slotmap",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "hashbrown"
 version = "0.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1567,6 +1579,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "slotmap"
+version = "1.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dbff4acf519f630b3a3ddcfaea6c06b42174d9a44bc70c620e9ed1649d58b82a"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "smallvec"
 version = "1.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1575,23 +1596,28 @@ checksum = "3c5e1a9a646d36c3599cd173a41282daf47c44583ad367b8e6837255952e5c67"
 [[package]]
 name = "smithay"
 version = "0.3.0"
-source = "git+https://github.com/stratawm/smithay?rev=8f132ec#8f132ecded5705e55fc1ce6cfa4b59850c6b038e"
+source = "git+https://github.com/stratawm/smithay?rev=fb44b24#fb44b240ea4a3aa39a6b92f5bede23301ab9a26e"
 dependencies = [
  "appendlist",
  "bitflags 2.5.0",
  "calloop 0.13.0",
+ "cc",
  "cgmath",
  "cursor-icon",
  "downcast-rs",
+ "drm",
+ "drm-ffi",
  "drm-fourcc",
  "errno",
  "gbm",
  "gl_generator",
+ "glow",
  "indexmap",
  "lazy_static",
  "libc",
  "libloading",
  "once_cell",
+ "pkg-config",
  "profiling",
  "rand",
  "rustix",
@@ -2428,6 +2454,7 @@ name = "wzm-comp"
 version = "0.1.0"
 dependencies = [
  "bitflags 2.5.0",
+ "cgmath",
  "nix",
  "once_cell",
  "smithay",

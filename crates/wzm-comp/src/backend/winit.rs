@@ -1,7 +1,6 @@
 use std::time::Duration;
 
 use smithay::backend::renderer::damage::OutputDamageTracker;
-use smithay::backend::renderer::element::surface::WaylandSurfaceRenderElement;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::backend::renderer::ImportEgl;
 use smithay::backend::winit;
@@ -13,6 +12,7 @@ use smithay::reexports::winit::window::WindowBuilder;
 use smithay::utils::Rectangle;
 use tracing::info;
 
+use crate::decoration::{BorderShader, CustomRenderElements};
 use crate::{CalloopData, DisplayHandle, Wzm};
 
 pub struct Winit {
@@ -32,6 +32,7 @@ impl Winit {
             .with_title("wzm");
 
         let (mut backend, winit) = winit::init_from_builder::<GlesRenderer>(builder)?;
+        BorderShader::init(backend.renderer());
 
         if backend.renderer().bind_wl_display(&display_handle).is_ok() {
             info!("EGL hardware-acceleration enabled");
@@ -82,17 +83,21 @@ impl Winit {
         let damage = Rectangle::from_loc_and_size((0, 0), size);
 
         self.backend.bind().unwrap();
-        smithay::desktop::space::render_output::<_, WaylandSurfaceRenderElement<GlesRenderer>, _, _>(
+        let render_elements = wzm
+            .get_current_workspace()
+            .render_elements(self.backend.renderer());
+
+        smithay::desktop::space::render_output::<_, CustomRenderElements<GlesRenderer>, _, _>(
             &self.output,
             self.backend.renderer(),
             1.0,
             0,
             [&wzm.space],
-            &[],
+            &render_elements,
             &mut self.damage_tracker,
             [0.1, 0.1, 0.1, 1.0],
         )
-            .unwrap();
+        .unwrap();
         self.backend.submit(Some(&[damage])).unwrap();
 
         wzm.space.elements().for_each(|window| {

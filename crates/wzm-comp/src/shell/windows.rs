@@ -1,4 +1,3 @@
-use crate::shell::drawable::{Border, Borders};
 use crate::shell::{node, FLOATING_Z_INDEX, TILING_Z_INDEX};
 use smithay::desktop::{Space, Window};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
@@ -18,7 +17,6 @@ pub struct WindowState {
     initial_size: RefCell<Size<i32, Logical>>,
     size: RefCell<Size<i32, Logical>>,
     loc: RefCell<Point<i32, Logical>>,
-    borders: RefCell<Borders>,
 }
 
 impl WindowState {
@@ -30,7 +28,6 @@ impl WindowState {
             initial_size: RefCell::new(Default::default()),
             size: RefCell::new(Default::default()),
             loc: RefCell::new(Default::default()),
-            borders: RefCell::new(Borders::default()),
         }
     }
 
@@ -65,10 +62,6 @@ impl WindowState {
     pub fn toggle_floating(&self) {
         let current = *self.floating.borrow();
         self.floating.replace(!current);
-    }
-
-    pub fn borders(&self) -> Borders {
-        self.borders.borrow().clone()
     }
 }
 
@@ -174,16 +167,8 @@ impl WindowWrap {
     {
         let state = self.get_state();
         let new_location = location.into();
-
-        let loc_changed = if *state.loc.borrow() != new_location {
+        if *state.loc.borrow() != new_location {
             state.loc.replace(new_location);
-            true
-        } else {
-            false
-        };
-
-        if loc_changed {
-            self.get_state().borders.replace(self.make_borders());
             true
         } else {
             false
@@ -217,12 +202,7 @@ impl WindowWrap {
             false
         };
 
-        if loc_changed || size_changed {
-            self.get_state().borders.replace(self.make_borders());
-            true
-        } else {
-            false
-        }
+        loc_changed || size_changed
     }
 
     pub fn send_close(&self) {

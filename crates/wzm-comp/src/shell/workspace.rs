@@ -1,9 +1,11 @@
+use crate::decoration::{BorderShader, CustomRenderElements};
 use crate::shell::container::{Container, ContainerLayout, ContainerRef};
-use crate::shell::drawable::{Border, Borders};
 use crate::shell::node;
 use crate::shell::node::Node;
 use crate::shell::nodemap::NodeMap;
 use crate::shell::windows::WindowWrap;
+use smithay::backend::renderer::gles::GlesRenderer;
+use smithay::backend::renderer::{Renderer, Texture};
 use smithay::desktop::{Space, Window};
 use smithay::output::Output;
 use smithay::utils::{Logical, Physical, Rectangle};
@@ -33,6 +35,61 @@ impl WorkspaceRef {
     }
 }
 
+impl WorkspaceRef {
+    pub fn render_elements(
+        &self,
+        renderer: &mut GlesRenderer,
+    ) -> Vec<CustomRenderElements<GlesRenderer>> {
+        let mut render_elements: Vec<CustomRenderElements<_>> = Vec::new();
+        let focus_id = self.get().get_focus().1.map(|w| w.id());
+
+        for element in self.get().flatten_containers() {
+            let container = element.get();
+
+            let mut size = container.size;
+            size.w += 10;
+            size.h += 10;
+            let mut loc = container.location;
+            loc.x -= 5;
+            loc.y -= 5;
+
+            render_elements.push(CustomRenderElements::Shader(BorderShader::element(
+                renderer,
+                size,
+                loc,
+                [0.0, 0.0, 5.0],
+                [0.4, 0.0, 0.0],
+                None,
+            )));
+        }
+
+        for element in &self.get().flatten_window() {
+            let (start_color, end_color) = focus_id
+                .map(|id| {
+                    if id == element.id() {
+                        ([0.5, 0.0, 0.0], [0.0, 0.0, 0.5])
+                    } else {
+                        ([0.5, 0.5, 0.0], [0.8, 0.0, 0.5])
+                    }
+                })
+                .unwrap_or(([0.5, 0.5, 0.0], [0.8, 0.0, 0.5]));
+
+            let window = element.inner();
+
+            render_elements.push(CustomRenderElements::Shader(BorderShader::element(
+                renderer,
+                window.geometry().size,
+                element.loc(),
+                start_color,
+                end_color,
+                Some(window.clone()),
+            )));
+        }
+
+        render_elements
+    }
+}
+
 #[derive(Debug)]
 pub struct Workspace {
     pub output: Output,
@@ -40,7 +97,6 @@ pub struct Workspace {
     root: ContainerRef,
     focus: ContainerRef,
     pub needs_redraw: bool,
-    pub borders: Vec<Borders>,
     pub gaps: i32,
 }
 
@@ -66,7 +122,6 @@ impl Workspace {
             focus,
             fullscreen_layer: None,
             needs_redraw: false,
-            borders: vec![],
             gaps,
         }
     }
@@ -166,8 +221,14 @@ impl Workspace {
         windows
     }
 
+    pub fn flatten_containers(&self) -> impl Iterator<Item = ContainerRef> {
+        self.root
+            .childs_containers()
+            .into_iter()
+            .flat_map(|container| container.childs_containers())
+    }
+
     pub fn unmap_all(&mut self, space: &mut Space<Window>) {
-        self.borders.drain(..);
         for window in self.flatten_window() {
             space.unmap_elem(window.inner());
         }
@@ -202,39 +263,5 @@ impl Workspace {
             let scale = self.output.current_scale().fractional_scale();
             geometry.to_f64().to_physical_precise_up(scale)
         })
-    }
-
-    pub fn update_borders(&mut self) {
-        debug!("Updating workspace borders");
-        match &self.fullscreen_layer {
-            Some(Node::Container(container)) => {
-                let container = container.get();
-                let container_borders = container.make_borders();
-                let window_borders = container
-                    .get_focused_window()
-                    .map(|window| window.get_state().borders());
-
-                self.borders = vec![container_borders];
-
-                if let Some(window_borders) = window_borders {
-                    self.borders.push(window_borders);
-                }
-            }
-            Some(Node::Window(_)) => {
-                // No border for window fullscreen mode
-            }
-            None => {
-                let (container, window) = self.get_focus();
-                let container = container.get();
-                let container_borders = container.make_borders();
-                let window_borders = window.map(|window| window.get_state().borders());
-
-                self.borders = vec![container_borders];
-
-                if let Some(window_borders) = window_borders {
-                    self.borders.push(window_borders);
-                }
-            }
-        }
     }
 }

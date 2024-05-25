@@ -10,5 +10,15 @@ wzm-comp = { path = "crates/wzm-comp" }
 default-features = false
 git = "https://github.com/stratawm/smithay"
 version = "0.3.0"
-rev = "8f132ec"
-features = ["desktop", "wayland_frontend", "backend_winit", "backend_egl", "use_system_lib"]
+rev = "fb44b24"
+features = [
+    "desktop",
+    "wayland_frontend",
+    "backend_winit",
+    "backend_egl",
+    "backend_drm",
+    "backend_gbm",
+    "use_system_lib",
+    "renderer_glow",
+    "renderer_multi",
+]

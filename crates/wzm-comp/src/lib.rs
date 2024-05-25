@@ -12,9 +12,11 @@ use crate::shell::workspace::WorkspaceRef;
 
 pub mod action;
 pub mod backend;
+pub mod decoration;
 pub mod grabs;
 pub mod handlers;
 pub mod input;
+pub mod renderer;
 pub mod shell;
 pub mod state;
 

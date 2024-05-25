@@ -63,6 +63,19 @@ impl ContainerRef {
                 .find_map(|c| c.find_container_by_id(id))
         })
     }
+
+    pub fn childs_containers(&self) -> Vec<ContainerRef> {
+        self.get()
+            .nodes
+            .iter_spine()
+            .filter_map(|(_, node)| match node {
+                Node::Container(container) => Some(container.clone().childs_containers()),
+                Node::Window(window) => None,
+            })
+            .flatten()
+            .chain([self.clone()])
+            .collect::<Vec<_>>()
+    }
 }
 
 #[derive(Debug)]

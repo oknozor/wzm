@@ -1,9 +1,10 @@
 use smithay::desktop::Window;
 use smithay::utils::{Point, Serial, SERIAL_COUNTER};
+use tracing::debug;
 
 use wzm_config::action::Direction;
 
-use crate::shell::container::ContainerLayout;
+use crate::shell::container::{ContainerLayout, ContainerState};
 use crate::shell::node::Node;
 use crate::shell::windows::{WindowState, WindowWrap};
 use crate::Wzm;
@@ -28,8 +29,6 @@ impl Wzm {
             let redraw = focus.0.get_mut().update_layout(output_geometry);
             ws.needs_redraw = redraw;
         }
-
-        ws.update_borders();
     }
 
     pub fn toggle_fullscreen_window(&mut self) {
@@ -65,7 +64,6 @@ impl Wzm {
             ws.fullscreen_layer = Some(Node::Container(container));
         }
 
-        ws.update_borders();
         ws.needs_redraw = true
     }
 
@@ -81,7 +79,6 @@ impl Wzm {
             let window = WindowWrap::from(window);
             ws.set_container_and_window_focus(&container, &window);
             self.toggle_window_focus(serial, window.inner());
-            ws.update_borders();
         }
     }
 
@@ -153,5 +150,90 @@ impl Wzm {
             }
         }
         window
+    }
+
+    pub fn close(&mut self) {
+        let state = {
+            let container = self.get_current_workspace().get_mut().get_focus().0;
+            let mut container = container.get_mut();
+            debug!("Closing window in container: {}", container.id);
+            container.close_window();
+            container.state()
+        };
+
+        match state {
+            ContainerState::Empty => {
+                debug!("Closing empty container");
+                let ws = self.get_current_workspace();
+                let mut ws = ws.get_mut();
+                ws.pop_container();
+                if let Some(window) = ws.get_focus().1 {
+                    self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
+                }
+            }
+            ContainerState::HasContainersOnly => {
+                debug!("Draining window from container");
+                {
+                    let container = {
+                        let ws = self.get_current_workspace();
+                        let ws = &ws.get_mut();
+                        ws.get_focus().0
+                    };
+
+                    let children: Option<Vec<(u32, Node)>> = {
+                        let mut container = container.get_mut();
+                        if container.parent.is_some() {
+                            Some(container.nodes.drain_all())
+                        } else {
+                            None
+                        }
+                    };
+
+                    let mut container = container.get_mut();
+                    let id = container.id;
+
+                    if let (Some(parent), Some(children)) = (&mut container.parent, children) {
+                        let mut parent = parent.get_mut();
+                        parent.nodes.remove(&id);
+                        parent.nodes.extend(children);
+                    }
+                }
+
+                let ws = self.get_current_workspace();
+                let ws = ws.get();
+
+                if let Some(window) = ws.get_focus().1 {
+                    self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
+                }
+            }
+            ContainerState::HasWindows => {
+                let ws = self.get_current_workspace();
+                let ws = ws.get();
+
+                if let Some(window) = ws.get_focus().1 {
+                    self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
+                }
+                debug!("Cannot remove non empty container");
+            }
+        };
+
+        // Reset focus
+        let workspace = self.get_current_workspace();
+        let mut workspace = workspace.get_mut();
+
+        {
+            if let Some(window) = workspace.get_focus().1 {
+                let handle = self
+                    .seat
+                    .get_keyboard()
+                    .expect("Should have a keyboard seat");
+
+                let serial = SERIAL_COUNTER.next_serial();
+                handle.set_focus(self, window.wl_surface().cloned(), serial);
+                workspace.needs_redraw = true;
+            }
+        }
+
+        workspace.update_layout(&self.space);
     }
 }

@@ -38,7 +38,7 @@ impl Wzm {
                 KeyAction::LayoutHorizontal => self.set_layout_h(),
                 KeyAction::ToggleFloating => self.toggle_floating(),
                 KeyAction::VtSwitch(_) => {}
-                KeyAction::Close => {}
+                KeyAction::CloseWindow => self.close(),
                 KeyAction::Quit => {}
                 KeyAction::None => {}
             },

@@ -1,14 +1,11 @@
 use crate::shell::workspace::WorkspaceRef;
 use crate::Wzm;
-use tracing::debug;
 
 pub mod container;
-pub mod drawable;
 pub mod node;
 pub mod nodemap;
 pub mod windows;
 pub mod workspace;
-
 pub const BLUE: (f32, f32, f32) = (26.0 / 255.0, 95.0 / 255.0, 205.0 / 255.0);
 pub const RED: (f32, f32, f32) = (1.0, 95.0 / 255.0, 205.0 / 255.0);
 
@@ -25,10 +22,6 @@ impl Wzm {
             .get(current)
             .expect("Current workspace should exist")
             .clone()
-    }
-
-    pub fn pretty_print_workspace(&self) {
-        debug!("{:#?}", self.workspaces);
     }
 
     pub fn move_to_workspace(&mut self, num: u8) {

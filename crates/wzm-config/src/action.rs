@@ -19,7 +19,7 @@ pub enum KeyAction {
     LayoutHorizontal,
     ToggleFloating,
     VtSwitch(i32),
-    Close,
+    CloseWindow,
     Quit,
     None,
 }

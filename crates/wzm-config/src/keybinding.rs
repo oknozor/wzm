@@ -85,7 +85,7 @@ pub enum Action {
         env: Vec<(String, String)>,
         command: String,
     },
-    Close,
+    CloseWindow,
     Quit,
 }
 
@@ -109,7 +109,7 @@ impl From<Action> for KeyAction {
             Action::LayoutHorizontal => KeyAction::LayoutHorizontal,
             Action::ToggleFloating => KeyAction::ToggleFloating,
             Action::Run { command, env } => KeyAction::Run(command, env),
-            Action::Close => KeyAction::Close,
+            Action::CloseWindow => KeyAction::CloseWindow,
             Action::Quit => KeyAction::Quit,
             Action::ToggleFullScreenWindow => KeyAction::ToggleFullScreenWindow,
             Action::ToggleFullScreenContainer => KeyAction::ToggleFullScreenContainer,
@@ -227,7 +227,7 @@ mod test {
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::a,
-                action: Action::Close,
+                action: Action::CloseWindow,
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
