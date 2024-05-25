@@ -1,3 +1,4 @@
+use crate::shell::windows::WindowState;
 use nix::libc;
 use smithay::backend::input::{
     AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
@@ -30,7 +31,7 @@ impl Wzm {
                 KeyAction::TogglePreview => {}
                 KeyAction::ToggleFullScreenWindow => self.toggle_fullscreen_window(),
                 KeyAction::ToggleFullScreenContainer => self.toggle_fullscreen_container(),
-                KeyAction::MoveWindow(_) => {}
+                KeyAction::MoveWindow(direction) => self.move_window(direction),
                 KeyAction::MoveContainer(_) => {}
                 KeyAction::MoveFocus(direction) => self.move_focus(direction),
                 KeyAction::MoveToWorkspace(_) => {}
@@ -78,26 +79,38 @@ impl Wzm {
                 let button_state = event.state();
 
                 if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
-                    if let Some((window, _loc)) = self
+                    let maybe_under_pointer = self
                         .space
                         .element_under(pointer.current_location())
-                        .map(|(w, l)| (w.clone(), l))
-                    {
-                        self.space.raise_element(&window, true);
-                        keyboard.set_focus(
-                            self,
-                            Some(window.toplevel().unwrap().wl_surface().clone()),
-                            serial,
-                        );
-                        self.space.elements().for_each(|window| {
-                            window.toplevel().unwrap().send_pending_configure();
-                        });
-                    } else {
-                        self.space.elements().for_each(|window| {
-                            window.set_activated(false);
-                            window.toplevel().unwrap().send_pending_configure();
-                        });
-                        keyboard.set_focus(self, Option::<WlSurface>::None, serial);
+                        .map(|(w, l)| (w.clone(), l));
+
+                    match maybe_under_pointer {
+                        Some((window, loc)) => {
+                            let workspace_ref = self.get_current_workspace();
+                            let mut ws = workspace_ref.get_mut();
+                            let id = window.user_data().get::<WindowState>().unwrap().id();
+                            let container = ws.root().container_having_window(id).unwrap();
+                            ws.set_container_focused(&container);
+                            container.get_mut().set_focus(id);
+
+                            self.space.raise_element(&window, true);
+                            keyboard.set_focus(
+                                self,
+                                Some(window.toplevel().unwrap().wl_surface().clone()),
+                                serial,
+                            );
+
+                            self.space.elements().for_each(|window| {
+                                window.toplevel().unwrap().send_pending_configure();
+                            });
+                        }
+                        None => {
+                            self.space.elements().for_each(|window| {
+                                window.set_activated(false);
+                                window.toplevel().unwrap().send_pending_configure();
+                            });
+                            keyboard.set_focus(self, Option::<WlSurface>::None, serial);
+                        }
                     }
                 };
 
@@ -162,8 +175,6 @@ impl Wzm {
         let time = Event::time_msec(&evt);
         let keyboard = self.seat.get_keyboard().unwrap();
 
-        let mut mod_pressed = false;
-
         let action = keyboard
             .input(
                 self,
@@ -174,10 +185,6 @@ impl Wzm {
                 |app_state, modifiers, key_handle| {
                     let keysym = key_handle.modified_sym();
                     if state == KeyState::Pressed {
-                        if modifiers.alt {
-                            mod_pressed = true;
-                        }
-
                         let action = app_state
                             .config
                             .keybindings
@@ -198,7 +205,6 @@ impl Wzm {
                             Some(action) => action,
                         }
                     } else {
-                        mod_pressed = false;
                         FilterResult::Forward
                     }
                 },

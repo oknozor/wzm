@@ -36,14 +36,36 @@ impl WorkspaceRef {
 }
 
 impl WorkspaceRef {
-    pub fn render_elements(
+    pub fn render_borders(
         &self,
         renderer: &mut GlesRenderer,
     ) -> Vec<CustomRenderElements<GlesRenderer>> {
         let mut render_elements: Vec<CustomRenderElements<_>> = Vec::new();
-        let focus_id = self.get().get_focus().1.map(|w| w.id());
+        let this = self.get();
 
-        for element in self.get().flatten_containers() {
+        let focus_id = this.get_focus().1.map(|w| w.id());
+
+        let focused_container = this.get_focused_container();
+        let focused_container = focused_container.get();
+
+        let mut size = focused_container.size;
+        size.w += 10;
+        size.h += 10;
+        let mut loc = focused_container.location;
+        loc.x -= 5;
+        loc.y -= 5;
+
+        render_elements.push(CustomRenderElements::Shader(BorderShader::element(
+            renderer,
+            size,
+            loc,
+            [0.0, 0.0, 5.0],
+            [0.4, 0.0, 0.0],
+            None,
+        )));
+
+        // Render all container borders
+        /*        for element in self.get().flatten_containers() {
             let container = element.get();
 
             let mut size = container.size;
@@ -62,8 +84,9 @@ impl WorkspaceRef {
                 None,
             )));
         }
+        */
 
-        for element in &self.get().flatten_window() {
+        for element in &this.flatten_window() {
             let (start_color, end_color) = focus_id
                 .map(|id| {
                     if id == element.id() {
@@ -263,5 +286,9 @@ impl Workspace {
             let scale = self.output.current_scale().fractional_scale();
             geometry.to_f64().to_physical_precise_up(scale)
         })
+    }
+
+    pub fn get_focused_container(&self) -> ContainerRef {
+        self.focus.clone()
     }
 }

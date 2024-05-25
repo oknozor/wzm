@@ -236,4 +236,84 @@ impl Wzm {
 
         workspace.update_layout(&self.space);
     }
+
+    pub fn move_window(&mut self, direction: Direction) {
+        debug!("{direction:?}");
+
+        // TODO: this should be simplified !
+        let new_focus = {
+            let ws = self.get_current_workspace();
+            let ws = ws.get();
+            let (container, window) = ws.get_focus();
+
+            match window {
+                Some(window) => {
+                    let target = self
+                        .scan_window(direction)
+                        .map(|target| target.user_data().get::<WindowState>().unwrap().id())
+                        .and_then(|id| {
+                            ws.root()
+                                .container_having_window(id)
+                                .map(|container| (id, container))
+                        });
+
+                    if let Some((target_window_id, target_container)) = target {
+                        let target_container_id = target_container.get().id;
+                        let current_container_id = container.get().id;
+
+                        // Ensure we are not taking a double borrow if window moves in the same container
+                        if target_container_id == current_container_id {
+                            let mut container = container.get_mut();
+                            container.nodes.remove(&window.id());
+                            match direction {
+                                Direction::Left | Direction::Up => {
+                                    container.insert_window_before(target_window_id, window)
+                                }
+                                Direction::Right | Direction::Down => {
+                                    container.insert_window_after(target_window_id, window)
+                                }
+                            }
+                        } else {
+                            let container_state = {
+                                let mut target_container = target_container.get_mut();
+                                let mut current = container.get_mut();
+                                current.nodes.remove(&window.id());
+                                match direction {
+                                    Direction::Left | Direction::Up => target_container
+                                        .insert_window_after(target_window_id, window),
+                                    Direction::Right | Direction::Down => target_container
+                                        .insert_window_before(target_window_id, window),
+                                }
+
+                                current.state()
+                            };
+
+                            if container_state == ContainerState::Empty {
+                                let container = container.get();
+                                if let Some(parent) = &container.parent {
+                                    let mut parent = parent.get_mut();
+                                    parent.nodes.remove(&container.id);
+                                }
+                            }
+                        }
+
+                        Some(target_container)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            }
+        };
+
+        if let Some(new_focus) = new_focus {
+            let ws = self.get_current_workspace();
+            let mut ws = ws.get_mut();
+            ws.set_container_focused(&new_focus);
+        }
+
+        let ws = self.get_current_workspace();
+        let mut ws = ws.get_mut();
+        ws.update_layout(&self.space);
+    }
 }

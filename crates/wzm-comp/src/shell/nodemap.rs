@@ -2,7 +2,6 @@ use smithay::utils::IsAlive;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
 use std::num::NonZeroUsize;
-use tracing::debug;
 
 use crate::shell::container::ContainerRef;
 use crate::shell::node::Node;
@@ -260,7 +259,6 @@ impl NodeMap {
     }
 
     fn set_focus_index(&mut self, idx: usize) {
-        debug!("Updating focus index={}", idx);
         debug_assert!(self.spine.get(idx).is_some());
         self.focus_idx = Some(idx)
     }

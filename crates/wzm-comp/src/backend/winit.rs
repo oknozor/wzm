@@ -85,7 +85,7 @@ impl Winit {
         self.backend.bind().unwrap();
         let render_elements = wzm
             .get_current_workspace()
-            .render_elements(self.backend.renderer());
+            .render_borders(self.backend.renderer());
 
         smithay::desktop::space::render_output::<_, CustomRenderElements<GlesRenderer>, _, _>(
             &self.output,
