@@ -85,7 +85,7 @@ impl Wzm {
                         .map(|(w, l)| (w.clone(), l));
 
                     match maybe_under_pointer {
-                        Some((window, loc)) => {
+                        Some((window, _)) => {
                             let workspace_ref = self.get_current_workspace();
                             let mut ws = workspace_ref.get_mut();
                             let id = window.user_data().get::<WindowState>().unwrap().id();

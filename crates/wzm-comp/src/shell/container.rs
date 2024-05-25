@@ -70,7 +70,7 @@ impl ContainerRef {
             .iter_spine()
             .filter_map(|(_, node)| match node {
                 Node::Container(container) => Some(container.clone().childs_containers()),
-                Node::Window(window) => None,
+                Node::Window(_) => None,
             })
             .flatten()
             .chain([self.clone()])

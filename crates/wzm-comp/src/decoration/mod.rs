@@ -108,7 +108,7 @@ where
     }
 }
 
-impl<'a, 'b> RenderElement<GlesRenderer> for CustomRenderElements<GlesRenderer> {
+impl RenderElement<GlesRenderer> for CustomRenderElements<GlesRenderer> {
     fn draw<'frame>(
         &self,
         frame: &mut GlesFrame,

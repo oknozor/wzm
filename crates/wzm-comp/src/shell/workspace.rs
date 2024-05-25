@@ -5,7 +5,6 @@ use crate::shell::node::Node;
 use crate::shell::nodemap::NodeMap;
 use crate::shell::windows::WindowWrap;
 use smithay::backend::renderer::gles::GlesRenderer;
-use smithay::backend::renderer::{Renderer, Texture};
 use smithay::desktop::{Space, Window};
 use smithay::output::Output;
 use smithay::utils::{Logical, Physical, Rectangle};
