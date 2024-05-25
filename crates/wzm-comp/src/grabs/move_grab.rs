@@ -1,3 +1,4 @@
+use crate::shell::windows::WindowWrap;
 use crate::Wzm;
 use smithay::desktop::Window;
 use smithay::input::pointer::{
@@ -30,6 +31,12 @@ impl PointerGrab<Wzm> for MoveSurfaceGrab {
         let new_location = self.initial_window_location.to_f64() + delta;
         data.space
             .map_element(self.window.clone(), new_location.to_i32_round(), true);
+        let window = WindowWrap::from(self.window.clone());
+        window.update_loc(new_location.to_i32_round());
+        window.map(&mut data.space, true);
+        let ws = data.get_current_workspace();
+        let mut ws = ws.get_mut();
+        ws.needs_redraw = true;
     }
 
     fn relative_motion(

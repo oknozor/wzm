@@ -21,4 +21,5 @@ features = [
     "use_system_lib",
     "renderer_glow",
     "renderer_multi",
+    "wayland-protocols"
 ]

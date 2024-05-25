@@ -52,6 +52,7 @@ impl Winit {
             size: backend.window_size(),
             refresh: 60_000,
         };
+        let _global = output.create_global::<Wzm>(&display_handle);
         output.change_current_state(Some(mode), None, None, None);
         output.set_preferred(mode);
         let damage_tracker = OutputDamageTracker::from_output(&output);

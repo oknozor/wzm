@@ -2,12 +2,11 @@ use smithay::delegate_xdg_shell;
 use smithay::desktop::{
     find_popup_root_surface, get_popup_toplevel_coords, PopupKind, PopupManager, Space, Window,
 };
-use smithay::input::pointer::{Focus, GrabStartData as PointerGrabStartData};
+use smithay::input::pointer::Focus;
 use smithay::input::Seat;
 use smithay::reexports::wayland_protocols::xdg::shell::server::xdg_toplevel;
 use smithay::reexports::wayland_server::protocol::wl_seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
-use smithay::reexports::wayland_server::Resource;
 use smithay::utils::{Rectangle, Serial, SERIAL_COUNTER};
 use smithay::wayland::compositor::with_states;
 use smithay::wayland::shell::xdg::{
@@ -17,6 +16,7 @@ use smithay::wayland::shell::xdg::{
 use tracing::debug;
 
 use crate::grabs::{MoveSurfaceGrab, ResizeSurfaceGrab};
+use crate::input::check_grab;
 use crate::Wzm;
 
 impl XdgShellHandler for Wzm {
@@ -62,7 +62,6 @@ impl XdgShellHandler for Wzm {
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
         let seat = Seat::from_resource(&seat).unwrap();
-
         let wl_surface = surface.wl_surface();
 
         if let Some(start_data) = check_grab(&seat, wl_surface, serial) {
@@ -149,29 +148,6 @@ impl XdgShellHandler for Wzm {
 // Xdg Shell
 delegate_xdg_shell!(Wzm);
 
-fn check_grab(
-    seat: &Seat<Wzm>,
-    surface: &WlSurface,
-    serial: Serial,
-) -> Option<PointerGrabStartData<Wzm>> {
-    let pointer = seat.get_pointer()?;
-
-    // Check that this surface has a click grab.
-    if !pointer.has_grab(serial) {
-        return None;
-    }
-
-    let start_data = pointer.grab_start_data()?;
-
-    let (focus, _) = start_data.focus.as_ref()?;
-    // If the focus was for a different surface, ignore the request.
-    if !focus.id().same_client_as(&surface.id()) {
-        return None;
-    }
-
-    Some(start_data)
-}
-
 /// Should be called on `WlSurface::commit`
 pub fn handle_commit(popups: &mut PopupManager, space: &Space<Window>, surface: &WlSurface) {
     // Handle toplevel commits.
@@ -226,7 +202,7 @@ pub fn handle_commit(popups: &mut PopupManager, space: &Space<Window>, surface: 
 }
 
 impl Wzm {
-    fn unconstrain_popup(&self, popup: &PopupSurface) {
+    pub(crate) fn unconstrain_popup(&self, popup: &PopupSurface) {
         let Ok(root) = find_popup_root_surface(&PopupKind::Xdg(popup.clone())) else {
             return;
         };

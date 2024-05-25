@@ -14,10 +14,12 @@ use smithay::utils::{Logical, Point};
 use smithay::wayland::compositor::{CompositorClientState, CompositorState};
 use smithay::wayland::output::OutputManagerState;
 use smithay::wayland::selection::data_device::DataDeviceState;
+use smithay::wayland::shell::wlr_layer::WlrLayerShellState;
 use smithay::wayland::shell::xdg::decoration::XdgDecorationState;
 use smithay::wayland::shell::xdg::XdgShellState;
 use smithay::wayland::shm::ShmState;
 use smithay::wayland::socket::ListeningSocketSource;
+use smithay::wayland::xdg_activation::XdgActivationState;
 
 use wzm_config::WzmConfig;
 
@@ -39,6 +41,8 @@ pub struct Wzm {
     pub data_device_state: DataDeviceState,
     pub popups: PopupManager,
     pub xdg_decoration_state: XdgDecorationState,
+    pub xdg_activation_state: XdgActivationState,
+    pub layer_shell_state: WlrLayerShellState,
     pub seat: Seat<Self>,
     // We should use this in calloopdata, not wazm
     pub config: WzmConfig,
@@ -68,6 +72,11 @@ impl Wzm {
         let data_device_state = DataDeviceState::new::<Self>(&dh);
         let popups = PopupManager::default();
         let xdg_decoration_state = XdgDecorationState::new::<Wzm>(&dh);
+        let xdg_activation_state = XdgActivationState::new::<Wzm>(&dh);
+        let layer_shell_state =
+            WlrLayerShellState::new_with_filter::<Wzm, _>(&dh, |client| {
+                !client.get_data::<ClientState>().unwrap().restricted
+            });
 
         // A seat is a group of keyboards, pointer and touch devices.
         // A seat typically has a pointer and maintains a keyboard focus and a pointer focus.
@@ -102,6 +111,8 @@ impl Wzm {
             data_device_state,
             popups,
             xdg_decoration_state,
+            xdg_activation_state,
+            layer_shell_state,
             seat,
             config: WzmConfig::get().expect("failed to get config"),
             mod_pressed: false,
@@ -169,6 +180,7 @@ impl Wzm {
 #[derive(Default)]
 pub struct ClientState {
     pub compositor_state: CompositorClientState,
+    pub restricted: bool,
 }
 
 impl ClientData for ClientState {

@@ -14,6 +14,8 @@ use crate::Wzm;
 mod compositor;
 mod decoration;
 mod xdg_shell;
+mod layer_shell;
+mod activation;
 //
 // Wl Seat
 //

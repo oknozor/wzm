@@ -1,13 +1,19 @@
-use crate::shell::windows::WindowState;
+use crate::grabs::MoveSurfaceGrab;
+use crate::shell::windows::{WindowState, WindowWrap};
 use nix::libc;
 use smithay::backend::input::{
     AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
-    KeyState, KeyboardKeyEvent, PointerAxisEvent, PointerButtonEvent,
+    KeyState, KeyboardKeyEvent, MouseButton, PointerAxisEvent, PointerButtonEvent,
 };
-use smithay::input::keyboard::FilterResult;
-use smithay::input::pointer::{AxisFrame, ButtonEvent, MotionEvent};
+use smithay::input::keyboard::{FilterResult, Keysym, ModifiersState};
+use smithay::input::pointer::{
+    AxisFrame, ButtonEvent, Focus, GrabStartData as PointerGrabStartData, MotionEvent,
+};
+use smithay::input::Seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
-use smithay::utils::SERIAL_COUNTER;
+use smithay::reexports::wayland_server::Resource;
+use smithay::utils::{Serial, SERIAL_COUNTER};
+use smithay::wayland::seat::WaylandFocus;
 use std::io;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Command, Stdio};
@@ -46,15 +52,10 @@ impl Wzm {
             InputEvent::PointerMotion { .. } => {}
             InputEvent::PointerMotionAbsolute { event, .. } => {
                 let output = self.space.outputs().next().unwrap();
-
                 let output_geo = self.space.output_geometry(output).unwrap();
-
                 let pos = event.position_transformed(output_geo.size) + output_geo.loc.to_f64();
-
                 let serial = SERIAL_COUNTER.next_serial();
-
                 let pointer = self.seat.get_pointer().unwrap();
-
                 let under = self.surface_under(pos);
 
                 pointer.motion(
@@ -68,63 +69,7 @@ impl Wzm {
                 );
                 pointer.frame(self);
             }
-            InputEvent::PointerButton { event, .. } => {
-                let pointer = self.seat.get_pointer().unwrap();
-                let keyboard = self.seat.get_keyboard().unwrap();
-
-                let serial = SERIAL_COUNTER.next_serial();
-
-                let button = event.button_code();
-
-                let button_state = event.state();
-
-                if ButtonState::Pressed == button_state && !pointer.is_grabbed() {
-                    let maybe_under_pointer = self
-                        .space
-                        .element_under(pointer.current_location())
-                        .map(|(w, l)| (w.clone(), l));
-
-                    match maybe_under_pointer {
-                        Some((window, _)) => {
-                            let workspace_ref = self.get_current_workspace();
-                            let mut ws = workspace_ref.get_mut();
-                            let id = window.user_data().get::<WindowState>().unwrap().id();
-                            let container = ws.root().container_having_window(id).unwrap();
-                            ws.set_container_focused(&container);
-                            container.get_mut().set_focus(id);
-
-                            self.space.raise_element(&window, true);
-                            keyboard.set_focus(
-                                self,
-                                Some(window.toplevel().unwrap().wl_surface().clone()),
-                                serial,
-                            );
-
-                            self.space.elements().for_each(|window| {
-                                window.toplevel().unwrap().send_pending_configure();
-                            });
-                        }
-                        None => {
-                            self.space.elements().for_each(|window| {
-                                window.set_activated(false);
-                                window.toplevel().unwrap().send_pending_configure();
-                            });
-                            keyboard.set_focus(self, Option::<WlSurface>::None, serial);
-                        }
-                    }
-                };
-
-                pointer.button(
-                    self,
-                    &ButtonEvent {
-                        button,
-                        state: button_state,
-                        serial,
-                        time: event.time_msec(),
-                    },
-                );
-                pointer.frame(self);
-            }
+            InputEvent::PointerButton { event, .. } => self.handle_pointer_button::<I>(&event),
             InputEvent::PointerAxis { event, .. } => {
                 let source = event.source();
 
@@ -174,7 +119,6 @@ impl Wzm {
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
         let keyboard = self.seat.get_keyboard().unwrap();
-
         let action = keyboard
             .input(
                 self,
@@ -184,34 +128,146 @@ impl Wzm {
                 time,
                 |app_state, modifiers, key_handle| {
                     let keysym = key_handle.modified_sym();
-                    if state == KeyState::Pressed {
-                        let action = app_state
-                            .config
-                            .keybindings
-                            .iter()
-                            .find_map(|binding| binding.match_action(*modifiers, keysym))
-                            .map(Action::into)
-                            .map(FilterResult::Intercept);
-
-                        match action {
-                            None => match keysym.raw() {
-                                KEY_XF86Switch_VT_1..=KEY_XF86Switch_VT_12 => {
-                                    FilterResult::Intercept(KeyAction::VtSwitch(
-                                        (keysym.raw() - KEY_XF86Switch_VT_1 + 1) as i32,
-                                    ))
-                                }
-                                _ => FilterResult::Forward,
-                            },
-                            Some(action) => action,
+                    match state {
+                        KeyState::Released if modifiers.alt => {
+                            app_state.mod_pressed = false;
+                            FilterResult::Forward
                         }
-                    } else {
-                        FilterResult::Forward
+                        KeyState::Pressed if modifiers.alt => {
+                            app_state.mod_pressed = true;
+                            Self::key_pressed_to_action(app_state, modifiers, keysym)
+                        }
+                        KeyState::Pressed => {
+                            Self::key_pressed_to_action(app_state, modifiers, keysym)
+                        }
+                        _ => FilterResult::Forward,
                     }
                 },
             )
             .unwrap_or(KeyAction::None);
 
         action
+    }
+
+    fn key_pressed_to_action(
+        app_state: &mut Wzm,
+        modifiers: &ModifiersState,
+        keysym: Keysym,
+    ) -> FilterResult<KeyAction> {
+        let action = app_state
+            .config
+            .keybindings
+            .iter()
+            .find_map(|binding| binding.match_action(*modifiers, keysym))
+            .map(Action::into)
+            .map(FilterResult::Intercept);
+
+        match action {
+            None => match keysym.raw() {
+                KEY_XF86Switch_VT_1..=KEY_XF86Switch_VT_12 => FilterResult::Intercept(
+                    KeyAction::VtSwitch((keysym.raw() - KEY_XF86Switch_VT_1 + 1) as i32),
+                ),
+                _ => FilterResult::Forward,
+            },
+            Some(action) => action,
+        }
+    }
+
+    pub fn handle_pointer_button<I: InputBackend>(
+        &mut self,
+        event: &<I as InputBackend>::PointerButtonEvent,
+    ) {
+        let pointer = self.seat.get_pointer().unwrap();
+        let keyboard = self.seat.get_keyboard().unwrap();
+        let serial = SERIAL_COUNTER.next_serial();
+        let button = event.button_code();
+        let state = event.state();
+
+        if let Some(MouseButton::Right) = event.button() {
+            if ButtonState::Pressed == state && !pointer.is_grabbed() {
+                if let Some((window, _loc)) = self.space.element_under(pointer.current_location()) {
+                    // Return early if we are not dealing with a toplevel window
+                    debug!("Entering grab start");
+                    if window.user_data().get::<WindowState>().is_none() {
+                        debug!("No user data");
+                        return;
+                    }
+
+                    let window = WindowWrap::from(window.clone());
+                    if self.mod_pressed {
+                        let pos = pointer.current_location();
+                        let initial_window_location = (pos.x as i32, pos.y as i32).into();
+                        debug!("Starting grab with");
+                        let seat = &self.seat;
+                        let wl_surface = window.inner().wl_surface().unwrap().clone();
+                        if let Some(start_data) = check_grab(seat, &wl_surface, serial) {
+                            debug!("START DATA");
+
+                            let window = window.inner().clone();
+                            let grab = MoveSurfaceGrab {
+                                start_data,
+                                window,
+                                initial_window_location,
+                            };
+
+                            debug!("Setting move surface grab");
+                            pointer.set_grab(self, grab, serial, Focus::Clear)
+                        } else {
+                            debug!("NO START DATA");
+                        }
+                    } else {
+                        debug!("no mod pressed");
+                    }
+                }
+            }
+        } else {
+            if ButtonState::Pressed == state && !pointer.is_grabbed() {
+                let maybe_under_pointer = self
+                    .space
+                    .element_under(pointer.current_location())
+                    .map(|(w, l)| (w.clone(), l));
+
+                match maybe_under_pointer {
+                    Some((window, _)) => {
+                        let workspace_ref = self.get_current_workspace();
+                        let mut ws = workspace_ref.get_mut();
+                        let id = window.user_data().get::<WindowState>().unwrap().id();
+                        let container = ws.root().container_having_window(id).unwrap();
+                        ws.set_container_focused(&container);
+                        container.get_mut().set_focus(id);
+
+                        self.space.raise_element(&window, true);
+                        keyboard.set_focus(
+                            self,
+                            Some(window.toplevel().unwrap().wl_surface().clone()),
+                            serial,
+                        );
+
+                        self.space.elements().for_each(|window| {
+                            window.toplevel().unwrap().send_pending_configure();
+                        });
+                    }
+                    None => {
+                        self.space.elements().for_each(|window| {
+                            window.set_activated(false);
+                            window.toplevel().unwrap().send_pending_configure();
+                        });
+                        keyboard.set_focus(self, Option::<WlSurface>::None, serial);
+                    }
+                }
+            };
+        }
+
+        pointer.button(
+            self,
+            &ButtonEvent {
+                button,
+                state,
+                serial,
+                time: event.time_msec(),
+            },
+        );
+        pointer.frame(self);
     }
 }
 
@@ -256,4 +312,27 @@ pub fn spawn(cmd: String, env: Vec<(String, String)>) {
             warn!("error waiting for child: {err:?}");
         }
     }
+}
+
+pub fn check_grab(
+    seat: &Seat<Wzm>,
+    surface: &WlSurface,
+    serial: Serial,
+) -> Option<PointerGrabStartData<Wzm>> {
+    let pointer = seat.get_pointer()?;
+
+    // Check that this surface has a click grab.
+    if !pointer.has_grab(serial) {
+        return None;
+    }
+
+    let start_data = pointer.grab_start_data()?;
+
+    let (focus, _) = start_data.focus.as_ref()?;
+    // If the focus was for a different surface, ignore the request.
+    if !focus.id().same_client_as(&surface.id()) {
+        return None;
+    }
+
+    Some(start_data)
 }
