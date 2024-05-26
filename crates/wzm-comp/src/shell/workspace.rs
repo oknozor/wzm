@@ -19,7 +19,7 @@ pub struct WorkspaceRef {
 
 impl WorkspaceRef {
     pub fn new(output: &Output, gaps: i32) -> Self {
-        let map = layer_map_for_output(&output);
+        let map = layer_map_for_output(output);
         let geometry = map.non_exclusive_zone();
         Self {
             inner: Rc::new(RefCell::new(Workspace::new(output, geometry, gaps))),

@@ -1,9 +1,7 @@
 use smithay::desktop::Window;
 use smithay::input::pointer::Focus;
-use smithay::input::Seat;
-use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Point, Serial, SERIAL_COUNTER};
-use tracing::{debug, warn};
+use tracing::{debug};
 
 use crate::grabs::MoveSurfaceGrab;
 use wzm_config::action::Direction;

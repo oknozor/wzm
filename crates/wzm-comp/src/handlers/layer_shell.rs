@@ -65,7 +65,7 @@ impl Wzm {
                     .initial_configure_sent
             });
 
-            let mut map = layer_map_for_output(&output);
+            let mut map = layer_map_for_output(output);
 
             map.arrange();
             if !initial_configure_sent {

@@ -1,4 +1,3 @@
-use crate::shell::windows::WindowWrap;
 use crate::Wzm;
 use smithay::desktop::Window;
 use smithay::input::pointer::{
@@ -32,7 +31,7 @@ impl PointerGrab<Wzm> for MoveSurfaceGrab {
         let new_location = self.initial_window_location.to_f64() + delta;
         let ws = data.get_current_workspace();
         let ws = ws.get_mut();
-        let (c, w) = ws.get_focus();
+        let (_, w) = ws.get_focus();
         let wrap = w.unwrap();
         wrap.update_loc(new_location.to_i32_round());
         debug!("moving window to {new_location:?}");

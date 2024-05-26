@@ -1,5 +1,4 @@
-use crate::grabs::MoveSurfaceGrab;
-use crate::shell::windows::{WindowState, WindowWrap};
+use crate::shell::windows::{WindowState};
 use nix::libc;
 use smithay::backend::input::{
     AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
@@ -118,7 +117,9 @@ impl Wzm {
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
         let keyboard = self.seat.get_keyboard().unwrap();
-        let action = keyboard
+        
+
+        keyboard
             .input(
                 self,
                 keycode,
@@ -143,9 +144,7 @@ impl Wzm {
                     }
                 },
             )
-            .unwrap_or(KeyAction::None);
-
-        action
+            .unwrap_or(KeyAction::None)
     }
 
     fn key_pressed_to_action(
@@ -183,47 +182,43 @@ impl Wzm {
         let state = event.state();
 
         if let Some(MouseButton::Right) = event.button() {
-            if ButtonState::Pressed == state && !pointer.is_grabbed() {
-                if self.mod_pressed {
-                    self.move_request_server(serial, button)
+            if ButtonState::Pressed == state && !pointer.is_grabbed() && self.mod_pressed {
+                self.move_request_server(serial, button)
+            }
+        } else if ButtonState::Pressed == state && !pointer.is_grabbed() {
+            let maybe_under_pointer = self
+                .space
+                .element_under(pointer.current_location())
+                .map(|(w, l)| (w.clone(), l));
+
+            match maybe_under_pointer {
+                Some((window, _)) => {
+                    let workspace_ref = self.get_current_workspace();
+                    let mut ws = workspace_ref.get_mut();
+                    let id = window.user_data().get::<WindowState>().unwrap().id();
+                    let container = ws.root().container_having_window(id).unwrap();
+                    ws.set_container_focused(&container);
+                    container.get_mut().set_focus(id);
+
+                    self.space.raise_element(&window, true);
+                    keyboard.set_focus(
+                        self,
+                        Some(window.toplevel().unwrap().wl_surface().clone()),
+                        serial,
+                    );
+
+                    self.space.elements().for_each(|window| {
+                        window.toplevel().unwrap().send_pending_configure();
+                    });
+                }
+                None => {
+                    self.space.elements().for_each(|window| {
+                        window.set_activated(false);
+                        window.toplevel().unwrap().send_pending_configure();
+                    });
+                    keyboard.set_focus(self, Option::<WlSurface>::None, serial);
                 }
             }
-        } else {
-            if ButtonState::Pressed == state && !pointer.is_grabbed() {
-                let maybe_under_pointer = self
-                    .space
-                    .element_under(pointer.current_location())
-                    .map(|(w, l)| (w.clone(), l));
-
-                match maybe_under_pointer {
-                    Some((window, _)) => {
-                        let workspace_ref = self.get_current_workspace();
-                        let mut ws = workspace_ref.get_mut();
-                        let id = window.user_data().get::<WindowState>().unwrap().id();
-                        let container = ws.root().container_having_window(id).unwrap();
-                        ws.set_container_focused(&container);
-                        container.get_mut().set_focus(id);
-
-                        self.space.raise_element(&window, true);
-                        keyboard.set_focus(
-                            self,
-                            Some(window.toplevel().unwrap().wl_surface().clone()),
-                            serial,
-                        );
-
-                        self.space.elements().for_each(|window| {
-                            window.toplevel().unwrap().send_pending_configure();
-                        });
-                    }
-                    None => {
-                        self.space.elements().for_each(|window| {
-                            window.set_activated(false);
-                            window.toplevel().unwrap().send_pending_configure();
-                        });
-                        keyboard.set_focus(self, Option::<WlSurface>::None, serial);
-                    }
-                }
-            };
         }
 
         pointer.button(
