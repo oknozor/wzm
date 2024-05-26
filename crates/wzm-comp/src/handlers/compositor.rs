@@ -39,6 +39,7 @@ impl CompositorHandler for Wzm {
             }
         };
 
+        self.layer_shell_handle_commit(surface);
         xdg_shell::handle_commit(&mut self.popups, &self.space, surface);
         resize_grab::handle_commit(&mut self.space, surface);
     }

@@ -5,9 +5,9 @@ use crate::shell::node::Node;
 use crate::shell::nodemap::NodeMap;
 use crate::shell::windows::WindowWrap;
 use smithay::backend::renderer::gles::GlesRenderer;
-use smithay::desktop::{Space, Window};
+use smithay::desktop::{layer_map_for_output, Space, Window};
 use smithay::output::Output;
-use smithay::utils::{Logical, Physical, Rectangle};
+use smithay::utils::{Logical, Rectangle};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use tracing::debug;
@@ -18,10 +18,11 @@ pub struct WorkspaceRef {
 }
 
 impl WorkspaceRef {
-    pub fn new(output: Output, space: &Space<Window>, gaps: i32) -> Self {
-        let geometry = space.output_geometry(&output).unwrap();
+    pub fn new(output: &Output, gaps: i32) -> Self {
+        let map = layer_map_for_output(&output);
+        let geometry = map.non_exclusive_zone();
         Self {
-            inner: Rc::new(RefCell::new(Workspace::new(&output, geometry, gaps))),
+            inner: Rc::new(RefCell::new(Workspace::new(output, geometry, gaps))),
         }
     }
 
@@ -148,16 +149,17 @@ impl Workspace {
         }
     }
 
-    pub fn update_layout(&mut self, space: &Space<Window>) {
-        let geometry = space.output_geometry(&self.output).unwrap();
+    pub fn update_layout(&mut self) {
+        let zone = self.non_exclusive_zone();
         let root = &self.root;
         let mut root = root.get_mut();
-        self.needs_redraw = root.update_layout(geometry);
+        self.needs_redraw = root.update_layout(zone);
     }
 
     pub fn redraw(&mut self, space: &mut Space<Window>) {
-        let geometry = space.output_geometry(&self.output).expect("Geometry");
         self.unmap_all(space);
+        let map = layer_map_for_output(&self.output);
+        let zone = map.non_exclusive_zone();
 
         if let Some(layer) = &self.fullscreen_layer {
             match layer {
@@ -168,7 +170,7 @@ impl Workspace {
                 }
                 Node::Window(window) => {
                     debug!("Redraw: FullScreen Window");
-                    window.set_fullscreen(geometry);
+                    window.set_fullscreen(zone);
                     window.map(space, true);
                 }
             }
@@ -186,7 +188,6 @@ impl Workspace {
     }
 
     pub fn get_focus(&self) -> (ContainerRef, Option<WindowWrap>) {
-        // FIXME: panic here some time
         let window = {
             let c = self.focus.get();
             c.get_focused_window()
@@ -264,30 +265,19 @@ impl Workspace {
         }
     }
 
-    pub fn reset_gaps(&self, space: &Space<Window>) {
-        let geometry = space
-            .output_geometry(&self.output)
-            .expect("Output should have a geometry");
+    pub fn reset_gaps(&self) {
+        let zone = self.non_exclusive_zone();
         let mut container = self.root.get_mut();
-        container.location = (geometry.loc.x + self.gaps, geometry.loc.y + self.gaps).into();
-        container.size = (
-            geometry.size.w - 2 * self.gaps,
-            geometry.size.h - 2 * self.gaps,
-        )
-            .into();
-    }
-
-    pub fn get_output_geometry_f64(
-        &self,
-        space: &Space<Window>,
-    ) -> Option<Rectangle<f64, Physical>> {
-        space.output_geometry(&self.output).map(|geometry| {
-            let scale = self.output.current_scale().fractional_scale();
-            geometry.to_f64().to_physical_precise_up(scale)
-        })
+        container.location = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
+        container.size = (zone.size.w - 2 * self.gaps, zone.size.h - 2 * self.gaps).into();
     }
 
     pub fn get_focused_container(&self) -> ContainerRef {
         self.focus.clone()
+    }
+
+    pub fn non_exclusive_zone(&self) -> Rectangle<i32, Logical> {
+        let map = layer_map_for_output(&self.output);
+        map.non_exclusive_zone()
     }
 }

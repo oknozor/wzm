@@ -35,7 +35,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             let ws = state.wzm.get_current_workspace();
             let mut ws = ws.get_mut();
             if ws.needs_redraw {
-                ws.update_layout(&state.wzm.space);
+                ws.update_layout();
                 ws.redraw(&mut state.wzm.space);
             }
         })

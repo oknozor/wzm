@@ -38,13 +38,12 @@ impl Wzm {
         match self.workspaces.get(&num) {
             None => {
                 let output = self.space.outputs().next().unwrap();
-                let workspace =
-                    WorkspaceRef::new(output.clone(), &self.space, self.config.gaps as i32);
+                let workspace = WorkspaceRef::new(output, self.config.gaps as i32);
                 self.workspaces.insert(num, workspace);
             }
             Some(workspace) => {
                 let mut workspace = workspace.get_mut();
-                workspace.update_layout(&self.space);
+                workspace.update_layout();
                 workspace.needs_redraw = true;
             }
         };

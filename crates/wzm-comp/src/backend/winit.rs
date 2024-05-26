@@ -27,7 +27,7 @@ impl Winit {
         display_handle: DisplayHandle,
     ) -> Result<Self, winit::Error> {
         let builder = WindowBuilder::new()
-            .with_inner_size(LogicalSize::new(1920.0, 1080.0))
+            .with_inner_size(LogicalSize::new(800.0, 600.0))
             .with_resizable(false)
             .with_title("wzm");
 
@@ -52,6 +52,7 @@ impl Winit {
             size: backend.window_size(),
             refresh: 60_000,
         };
+
         let _global = output.create_global::<Wzm>(&display_handle);
         output.change_current_state(Some(mode), None, None, None);
         output.set_preferred(mode);

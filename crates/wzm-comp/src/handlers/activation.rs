@@ -1,9 +1,11 @@
+use crate::Wzm;
 use smithay::delegate_xdg_activation;
 use smithay::input::Seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::wayland::seat::WaylandFocus;
-use smithay::wayland::xdg_activation::{XdgActivationHandler, XdgActivationState, XdgActivationToken, XdgActivationTokenData};
-use crate::Wzm;
+use smithay::wayland::xdg_activation::{
+    XdgActivationHandler, XdgActivationState, XdgActivationToken, XdgActivationTokenData,
+};
 
 impl XdgActivationHandler for Wzm {
     fn activation_state(&mut self) -> &mut XdgActivationState {
@@ -15,9 +17,9 @@ impl XdgActivationHandler for Wzm {
             let keyboard = self.seat.get_keyboard().unwrap();
             Seat::from_resource(&seat) == Some(self.seat.clone())
                 && keyboard
-                .last_enter()
-                .map(|last_enter| serial.is_no_older_than(&last_enter))
-                .unwrap_or(false)
+                    .last_enter()
+                    .map(|last_enter| serial.is_no_older_than(&last_enter))
+                    .unwrap_or(false)
         } else {
             false
         }

@@ -310,15 +310,11 @@ impl Container {
         }
     }
 
-    pub fn set_fullscreen_loc_and_size(&mut self, output_geometry: Rectangle<i32, Logical>) {
+    pub fn set_fullscreen_loc_and_size(&mut self, zone: Rectangle<i32, Logical>) {
         let gaps = self.gaps;
-        self.location = (output_geometry.loc.x + gaps, output_geometry.loc.y + gaps).into();
-        self.size = (
-            output_geometry.size.w - 2 * gaps,
-            output_geometry.size.h - 2 * gaps,
-        )
-            .into();
-        self.update_layout(output_geometry);
+        self.location = (zone.loc.x + gaps, zone.loc.y + gaps).into();
+        self.size = (zone.size.w - 2 * gaps, zone.size.h - 2 * gaps).into();
+        self.update_layout(zone);
     }
 
     pub fn state(&self) -> ContainerState {
@@ -331,33 +327,38 @@ impl Container {
         }
     }
 
-    pub fn update_layout(&mut self, output_geometry: Rectangle<i32, Logical>) -> bool {
-        debug!("Update Layout for container: id={}", self.id);
+    pub fn update_layout(&mut self, zone: Rectangle<i32, Logical>) -> bool {
+        debug!(
+            "Update Layout for container: id={}, h: {}, w: {}",
+            self.id, zone.size.h, zone.size.w
+        );
         let mut redraw = self.nodes.remove_dead_windows();
 
         if self.nodes.spine.is_empty() {
             return false;
         }
 
+        self.size = (zone.size.w - 2 * self.gaps, zone.size.h - 2 * self.gaps).into();
+        self.location = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
+
         self.reparent_orphans();
 
         if let Some(size) = self.get_child_size() {
             let mut tiling_index = 0;
-
             for (_, node) in self.nodes.iter_spine() {
                 match node {
                     Node::Container(container) => {
                         let mut child = container.get_mut();
                         child.location = self.get_loc_for_index(tiling_index, size);
                         child.size = size;
-                        if child.update_layout(output_geometry) {
+                        if child.update_layout(zone) {
                             redraw = true
                         };
                         tiling_index += 1;
                     }
 
                     Node::Window(window) if window.is_floating() => {
-                        window.update_floating(output_geometry);
+                        window.update_floating(zone);
                     }
 
                     Node::Window(window) => {
@@ -374,7 +375,7 @@ impl Container {
             for (_, node) in self.nodes.iter_spine() {
                 match node {
                     Node::Window(window) if window.is_floating() => {
-                        if window.update_floating(output_geometry) {
+                        if window.update_floating(zone) {
                             redraw = true
                         }
                     }

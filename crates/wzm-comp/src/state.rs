@@ -73,10 +73,9 @@ impl Wzm {
         let popups = PopupManager::default();
         let xdg_decoration_state = XdgDecorationState::new::<Wzm>(&dh);
         let xdg_activation_state = XdgActivationState::new::<Wzm>(&dh);
-        let layer_shell_state =
-            WlrLayerShellState::new_with_filter::<Wzm, _>(&dh, |client| {
-                !client.get_data::<ClientState>().unwrap().restricted
-            });
+        let layer_shell_state = WlrLayerShellState::new_with_filter::<Wzm, _>(&dh, |client| {
+            !client.get_data::<ClientState>().unwrap().restricted
+        });
 
         // A seat is a group of keyboards, pointer and touch devices.
         // A seat typically has a pointer and maintains a keyboard focus and a pointer focus.

@@ -25,7 +25,7 @@ impl Wzm {
 
         if let Some(window) = focus.1 {
             window.toggle_floating();
-            let output_geometry = self.space.output_geometry(&ws.output).unwrap();
+            let output_geometry = ws.non_exclusive_zone();
             let redraw = focus.0.get_mut().update_layout(output_geometry);
             ws.needs_redraw = redraw;
         }
@@ -37,7 +37,7 @@ impl Wzm {
 
         if ws.fullscreen_layer.is_some() {
             ws.fullscreen_layer = None;
-            ws.update_layout(&self.space);
+            ws.update_layout();
         } else {
             let (_c, window) = ws.get_focus();
             if let Some(window) = window {
@@ -52,15 +52,13 @@ impl Wzm {
         let ws = self.get_current_workspace();
         let mut ws = ws.get_mut();
         if ws.fullscreen_layer.is_some() {
-            ws.reset_gaps(&self.space);
+            ws.reset_gaps();
             ws.fullscreen_layer = None;
-            ws.update_layout(&self.space);
+            ws.update_layout();
         } else {
             let (container, _) = ws.get_focus();
-            let output_geometry = self.space.output_geometry(&ws.output).unwrap();
-            container
-                .get_mut()
-                .set_fullscreen_loc_and_size(output_geometry);
+            let zone = ws.non_exclusive_zone();
+            container.get_mut().set_fullscreen_loc_and_size(zone);
             ws.fullscreen_layer = Some(Node::Container(container));
         }
 
@@ -234,7 +232,7 @@ impl Wzm {
             }
         }
 
-        workspace.update_layout(&self.space);
+        workspace.update_layout();
     }
 
     pub fn move_window(&mut self, direction: Direction) {
@@ -314,6 +312,6 @@ impl Wzm {
 
         let ws = self.get_current_workspace();
         let mut ws = ws.get_mut();
-        ws.update_layout(&self.space);
+        ws.update_layout();
     }
 }

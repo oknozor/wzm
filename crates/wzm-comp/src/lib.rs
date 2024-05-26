@@ -19,7 +19,6 @@ pub mod input;
 pub mod renderer;
 pub mod shell;
 pub mod state;
-
 pub struct CalloopData {
     pub wzm: Wzm,
     pub config: WzmConfig,
@@ -32,10 +31,9 @@ impl CalloopData {
         ::std::env::set_var("WAYLAND_DISPLAY", &self.wzm.socket_name);
 
         if let Some(output) = self.wzm.space.outputs().next() {
-            self.wzm.workspaces.insert(
-                0,
-                WorkspaceRef::new(output.clone(), &self.wzm.space, self.config.gaps as i32),
-            );
+            self.wzm
+                .workspaces
+                .insert(0, WorkspaceRef::new(output, self.config.gaps as i32));
         } else {
             panic!("Failed to create Workspace 0 on default Output");
         }

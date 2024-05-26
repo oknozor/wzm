@@ -77,11 +77,11 @@ pub struct XdgTopLevelAttributes {
 }
 
 impl WindowWrap {
-    pub fn update_floating(&self, output_geometry: Rectangle<i32, Logical>) -> bool {
+    pub fn update_floating(&self, zone: Rectangle<i32, Logical>) -> bool {
         let (size, location) = if self.get_state().configured() {
             let initial_size = self.get_state().initial_size();
             let size = initial_size;
-            let location = self.center(output_geometry.size);
+            let location = self.center(zone.size);
             (Some(size), location)
         } else {
             (None, (0, 0).into())
@@ -90,8 +90,8 @@ impl WindowWrap {
         self.update_loc_and_size(size, location)
     }
 
-    pub fn set_fullscreen(&self, geometry: Rectangle<i32, Logical>) {
-        self.update_loc_and_size(Some(geometry.size), geometry.loc);
+    pub fn set_fullscreen(&self, zone: Rectangle<i32, Logical>) {
+        self.update_loc_and_size(Some(zone.size), zone.loc);
     }
 
     pub fn xdg_surface_attributes(&self) -> XdgTopLevelAttributes {
