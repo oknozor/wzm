@@ -7,13 +7,12 @@ use smithay::backend::input::{
 };
 use smithay::input::keyboard::{FilterResult, Keysym, ModifiersState};
 use smithay::input::pointer::{
-    AxisFrame, ButtonEvent, Focus, GrabStartData as PointerGrabStartData, MotionEvent,
+    AxisFrame, ButtonEvent, GrabStartData as PointerGrabStartData, MotionEvent,
 };
 use smithay::input::Seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::Resource;
 use smithay::utils::{Serial, SERIAL_COUNTER};
-use smithay::wayland::seat::WaylandFocus;
 use std::io;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Command, Stdio};
@@ -185,39 +184,8 @@ impl Wzm {
 
         if let Some(MouseButton::Right) = event.button() {
             if ButtonState::Pressed == state && !pointer.is_grabbed() {
-                if let Some((window, _loc)) = self.space.element_under(pointer.current_location()) {
-                    // Return early if we are not dealing with a toplevel window
-                    debug!("Entering grab start");
-                    if window.user_data().get::<WindowState>().is_none() {
-                        debug!("No user data");
-                        return;
-                    }
-
-                    let window = WindowWrap::from(window.clone());
-                    if self.mod_pressed {
-                        let pos = pointer.current_location();
-                        let initial_window_location = (pos.x as i32, pos.y as i32).into();
-                        debug!("Starting grab with");
-                        let seat = &self.seat;
-                        let wl_surface = window.inner().wl_surface().unwrap().clone();
-                        if let Some(start_data) = check_grab(seat, &wl_surface, serial) {
-                            debug!("START DATA");
-
-                            let window = window.inner().clone();
-                            let grab = MoveSurfaceGrab {
-                                start_data,
-                                window,
-                                initial_window_location,
-                            };
-
-                            debug!("Setting move surface grab");
-                            pointer.set_grab(self, grab, serial, Focus::Clear)
-                        } else {
-                            debug!("NO START DATA");
-                        }
-                    } else {
-                        debug!("no mod pressed");
-                    }
+                if self.mod_pressed {
+                    self.move_request_server(serial, button)
                 }
             }
         } else {

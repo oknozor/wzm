@@ -9,6 +9,7 @@ use smithay::input::pointer::{
 };
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
+use tracing::debug;
 
 pub struct MoveSurfaceGrab {
     pub start_data: PointerGrabStartData<Wzm>,
@@ -29,14 +30,14 @@ impl PointerGrab<Wzm> for MoveSurfaceGrab {
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
-        data.space
-            .map_element(self.window.clone(), new_location.to_i32_round(), true);
-        let window = WindowWrap::from(self.window.clone());
-        window.update_loc(new_location.to_i32_round());
-        window.map(&mut data.space, true);
         let ws = data.get_current_workspace();
-        let mut ws = ws.get_mut();
-        ws.needs_redraw = true;
+        let ws = ws.get_mut();
+        let (c, w) = ws.get_focus();
+        let wrap = w.unwrap();
+        wrap.update_loc(new_location.to_i32_round());
+        debug!("moving window to {new_location:?}");
+
+        wrap.map(&mut data.space, true);
     }
 
     fn relative_motion(
@@ -57,12 +58,7 @@ impl PointerGrab<Wzm> for MoveSurfaceGrab {
     ) {
         handle.button(data, event);
 
-        // The button is a button code as defined in the
-        // Linux kernel's linux/input-event-codes.h header file, e.g. BTN_LEFT.
-        const BTN_LEFT: u32 = 0x110;
-
-        if !handle.current_pressed().contains(&BTN_LEFT) {
-            // No more buttons are pressed, release the grab.
+        if !handle.current_pressed().contains(&self.start_data.button) {
             handle.unset_grab(self, data, event.serial, event.time, true);
         }
     }

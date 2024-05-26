@@ -1,7 +1,11 @@
 use smithay::desktop::Window;
+use smithay::input::pointer::Focus;
+use smithay::input::Seat;
+use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Point, Serial, SERIAL_COUNTER};
-use tracing::debug;
+use tracing::{debug, warn};
 
+use crate::grabs::MoveSurfaceGrab;
 use wzm_config::action::Direction;
 
 use crate::shell::container::{ContainerLayout, ContainerState};
@@ -313,5 +317,36 @@ impl Wzm {
         let ws = self.get_current_workspace();
         let mut ws = ws.get_mut();
         ws.update_layout();
+    }
+
+    pub fn move_request_server(&mut self, serial: Serial, button_used: u32) {
+        debug!("Initiating move request from server");
+
+        let pointer = self.seat.get_pointer().expect("seat had no pointer");
+        let point = pointer.current_location();
+        let Some((window, window_loc)) = self.space.element_under(point) else {
+            debug!("no window below cursor");
+            return;
+        };
+
+        // Return early if this is not a toplevel window
+        if window.user_data().get::<WindowState>().is_none() {
+            debug!("not a toplevel window");
+            return;
+        }
+
+        let start_data = smithay::input::pointer::GrabStartData {
+            focus: pointer.current_focus().map(|focus| (focus, window_loc)),
+            button: button_used,
+            location: pointer.current_location(),
+        };
+
+        let grab = MoveSurfaceGrab {
+            start_data,
+            window: window.clone(),
+            initial_window_location: window_loc,
+        };
+
+        pointer.set_grab(self, grab, serial, Focus::Clear);
     }
 }
