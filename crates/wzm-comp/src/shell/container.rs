@@ -7,7 +7,7 @@ use smithay::utils::{Logical, Point, Rectangle, Size};
 
 use smithay::output::Output;
 use smithay::wayland::shell::xdg::ToplevelSurface;
-use tracing::{debug};
+use tracing::debug;
 
 use crate::shell::node;
 use crate::shell::node::Node;
@@ -86,7 +86,7 @@ pub struct Container {
     pub output: Output,
     pub parent: Option<ContainerRef>,
     pub nodes: NodeMap,
-    pub layout: ContainerLayout,
+    pub layout: LayoutDirection,
     pub gaps: i32,
 }
 
@@ -98,20 +98,16 @@ pub enum ContainerState {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum ContainerLayout {
+pub enum LayoutDirection {
     Vertical,
     Horizontal,
 }
 
 impl Container {
     pub fn close_focused_window(&mut self) {
-        let idx = self.get_focused_window().map(|window| {
-            debug!("Closing window({:?})", window.id());
+        if let Some(window) = self.get_focused_window() {
             window.send_close();
-            window.id()
-        });
-
-        if let Some(id) = idx {
+            let id = window.id();
             debug!("Removing window({:?}) from the tree", id);
             let _surface = self.nodes.remove(&id);
         }
@@ -119,23 +115,23 @@ impl Container {
 
     pub fn create_child(
         &mut self,
-        layout: ContainerLayout,
+        direction: LayoutDirection,
         parent: ContainerRef,
         gaps: i32,
     ) -> ContainerRef {
         if self.nodes.spine.len() <= 1 {
-            self.layout = layout;
+            self.layout = direction;
             parent
         } else {
             let size = match self.layout {
-                ContainerLayout::Vertical => (self.size.w, self.size.h / 2),
-                ContainerLayout::Horizontal => (self.size.w / 2, self.size.h),
+                LayoutDirection::Vertical => (self.size.w, self.size.h / 2),
+                LayoutDirection::Horizontal => (self.size.w / 2, self.size.h),
             }
             .into();
 
             let location = match self.layout {
-                ContainerLayout::Vertical => (self.location.x, self.location.y + self.size.h),
-                ContainerLayout::Horizontal => (self.location.x + self.size.w, self.location.y),
+                LayoutDirection::Vertical => (self.location.x, self.location.y + self.size.h),
+                LayoutDirection::Horizontal => (self.location.x + self.size.w, self.location.y),
             }
             .into();
 
@@ -146,7 +142,7 @@ impl Container {
                 output: self.output.clone(),
                 parent: Some(parent),
                 nodes: NodeMap::default(),
-                layout,
+                layout: direction,
                 gaps,
             };
 
@@ -191,12 +187,12 @@ impl Container {
                     let gaps = self.gaps;
                     let total_gaps = gaps * (len - 1);
                     match self.layout {
-                        ContainerLayout::Vertical => {
+                        LayoutDirection::Vertical => {
                             let w = self.size.w;
                             let h = (self.size.h - total_gaps) / len;
                             (w, h)
                         }
-                        ContainerLayout::Horizontal => {
+                        LayoutDirection::Horizontal => {
                             let w = (self.size.w - total_gaps) / len;
                             let h = self.size.h;
                             (w, h)
@@ -226,12 +222,12 @@ impl Container {
             let pos = idx as i32;
 
             match self.layout {
-                ContainerLayout::Vertical => {
+                LayoutDirection::Vertical => {
                     let x = self.location.x;
                     let y = self.location.y + (size.h + gaps) * pos;
                     (x, y)
                 }
-                ContainerLayout::Horizontal => {
+                LayoutDirection::Horizontal => {
                     let x = self.location.x + (size.w + gaps) * pos;
                     let y = self.location.y;
                     (x, y)
@@ -328,18 +324,10 @@ impl Container {
     }
 
     pub fn update_layout(&mut self, zone: Rectangle<i32, Logical>) -> bool {
-        debug!(
-            "Update Layout for container: id={}, h: {}, w: {}",
-            self.id, zone.size.h, zone.size.w
-        );
         let mut redraw = self.nodes.remove_dead_windows();
         if self.nodes.spine.is_empty() {
             return false;
         }
-
-        self.size = (zone.size.w - 2 * self.gaps, zone.size.h - 2 * self.gaps).into();
-        self.location = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
-
         self.reparent_orphans();
 
         if let Some(size) = self.get_child_size() {

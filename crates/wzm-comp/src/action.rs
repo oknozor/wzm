@@ -1,23 +1,23 @@
 use smithay::desktop::Window;
 use smithay::input::pointer::Focus;
 use smithay::utils::{Point, Serial, SERIAL_COUNTER};
-use tracing::{debug};
+use tracing::debug;
 
 use crate::grabs::MoveSurfaceGrab;
 use wzm_config::action::Direction;
 
-use crate::shell::container::{ContainerLayout, ContainerState};
+use crate::shell::container::{ContainerState, LayoutDirection};
 use crate::shell::node::Node;
 use crate::shell::windows::{WindowState, WzmWindow};
 use crate::Wzm;
 
 impl Wzm {
     pub fn set_layout_h(&mut self) {
-        self.next_layout = Some(ContainerLayout::Horizontal)
+        self.next_layout = Some(LayoutDirection::Horizontal)
     }
 
     pub fn set_layout_v(&mut self) {
-        self.next_layout = Some(ContainerLayout::Vertical)
+        self.next_layout = Some(LayoutDirection::Vertical)
     }
 
     pub fn toggle_floating(&mut self) {
@@ -27,8 +27,8 @@ impl Wzm {
 
         if let Some(window) = focus.1 {
             window.toggle_floating();
-            let output_geometry = ws.non_exclusive_zone();
-            let redraw = focus.0.get_mut().update_layout(output_geometry);
+            let zone = ws.non_exclusive_zone();
+            let redraw = focus.0.get_mut().update_layout(zone);
             ws.needs_redraw = redraw;
         }
     }

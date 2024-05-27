@@ -1,5 +1,5 @@
 use crate::decoration::{BorderShader, CustomRenderElements};
-use crate::shell::container::{Container, ContainerLayout, ContainerRef};
+use crate::shell::container::{Container, ContainerRef, LayoutDirection};
 use crate::shell::node;
 use crate::shell::node::Node;
 use crate::shell::nodemap::NodeMap;
@@ -10,7 +10,7 @@ use smithay::output::Output;
 use smithay::utils::{Logical, Rectangle};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
-use tracing::{debug};
+use tracing::debug;
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceRef {
@@ -42,9 +42,7 @@ impl WorkspaceRef {
     ) -> Vec<CustomRenderElements<GlesRenderer>> {
         let mut render_elements: Vec<CustomRenderElements<_>> = Vec::new();
         let this = self.get();
-
         let focus_id = this.get_focus().1.map(|w| w.id());
-
         let focused_container = this.get_focused_container();
         let focused_container = focused_container.get();
 
@@ -132,7 +130,7 @@ impl Workspace {
             output: output.clone(),
             parent: None,
             nodes: NodeMap::default(),
-            layout: ContainerLayout::Horizontal,
+            layout: LayoutDirection::Horizontal,
             gaps,
         };
 
@@ -153,6 +151,9 @@ impl Workspace {
         let zone = self.non_exclusive_zone();
         let root = &self.root;
         let mut root = root.get_mut();
+        root.size = (zone.size.w - 2 * self.gaps, zone.size.h - 2 * self.gaps).into();
+        root.location = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
+
         self.needs_redraw = root.update_layout(zone);
     }
 
@@ -196,7 +197,7 @@ impl Workspace {
         (self.focus.clone(), window)
     }
 
-    pub fn create_container(&mut self, layout: ContainerLayout) -> ContainerRef {
+    pub fn create_container(&mut self, layout: LayoutDirection) -> ContainerRef {
         let child = {
             let (container, _) = self.get_focus();
             let parent = container.clone();
@@ -223,11 +224,7 @@ impl Workspace {
         self.focus = container.clone();
     }
 
-    pub fn set_container_and_window_focus(
-        &mut self,
-        container: &ContainerRef,
-        window: &WzmWindow,
-    ) {
+    pub fn set_container_and_window_focus(&mut self, container: &ContainerRef, window: &WzmWindow) {
         self.focus = container.clone();
         container.get_mut().set_focus(window.id());
     }

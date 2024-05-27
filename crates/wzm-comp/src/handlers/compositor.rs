@@ -1,13 +1,13 @@
-use smithay::{delegate_compositor, delegate_shm};
 use smithay::backend::renderer::utils::on_commit_buffer_handler;
-use smithay::reexports::wayland_server::{Client};
 use smithay::reexports::wayland_server::protocol::wl_buffer;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+use smithay::reexports::wayland_server::Client;
 use smithay::wayland::buffer::BufferHandler;
 use smithay::wayland::compositor::{
-    CompositorClientState, CompositorHandler, CompositorState, get_parent, is_sync_subsurface,
+    get_parent, is_sync_subsurface, CompositorClientState, CompositorHandler, CompositorState,
 };
 use smithay::wayland::shm::{ShmHandler, ShmState};
+use smithay::{delegate_compositor, delegate_shm};
 
 use crate::grabs::resize_grab;
 use crate::state::ClientState;
@@ -50,7 +50,6 @@ impl CompositorHandler for Wzm {
         let mut ws = ws.get_mut();
         ws.update_layout();
     }
-
 }
 
 impl BufferHandler for Wzm {

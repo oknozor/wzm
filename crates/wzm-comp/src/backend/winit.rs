@@ -100,6 +100,7 @@ impl Winit {
             [0.1, 0.1, 0.1, 1.0],
         )
         .unwrap();
+
         self.backend.submit(Some(&[damage])).unwrap();
 
         wzm.space.elements().for_each(|window| {

@@ -24,7 +24,7 @@ use smithay::wayland::xdg_foreign::XdgForeignState;
 
 use wzm_config::WzmConfig;
 
-use crate::shell::container::ContainerLayout;
+use crate::shell::container::LayoutDirection;
 use crate::shell::workspace::WorkspaceRef;
 use crate::CalloopData;
 
@@ -53,7 +53,7 @@ pub struct Wzm {
     pub mod_pressed: bool,
     pub workspaces: HashMap<u8, WorkspaceRef>,
     pub current_workspace: u8,
-    pub next_layout: Option<ContainerLayout>,
+    pub next_layout: Option<LayoutDirection>,
 }
 
 impl Wzm {

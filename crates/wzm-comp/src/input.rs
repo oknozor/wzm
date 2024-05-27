@@ -1,4 +1,4 @@
-use crate::shell::windows::{WindowState};
+use crate::shell::windows::WindowState;
 use nix::libc;
 use smithay::backend::input::{
     AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
@@ -117,7 +117,6 @@ impl Wzm {
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
         let keyboard = self.seat.get_keyboard().unwrap();
-        
 
         keyboard
             .input(

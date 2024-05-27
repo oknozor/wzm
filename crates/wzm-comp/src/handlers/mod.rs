@@ -7,8 +7,8 @@ use smithay::wayland::selection::data_device::{
     ServerDndGrabHandler,
 };
 use smithay::wayland::selection::SelectionHandler;
-use smithay::{delegate_data_device, delegate_output, delegate_seat, delegate_xdg_foreign};
 use smithay::wayland::xdg_foreign::{XdgForeignHandler, XdgForeignState};
+use smithay::{delegate_data_device, delegate_output, delegate_seat, delegate_xdg_foreign};
 
 use crate::Wzm;
 
@@ -71,7 +71,6 @@ impl XdgForeignHandler for Wzm {
     fn xdg_foreign_state(&mut self) -> &mut XdgForeignState {
         &mut self.xdg_foreign_state
     }
-
 }
 
 delegate_xdg_foreign!(Wzm);
