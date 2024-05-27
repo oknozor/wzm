@@ -5,7 +5,7 @@ use std::num::NonZeroUsize;
 
 use crate::shell::container::ContainerRef;
 use crate::shell::node::Node;
-use crate::shell::windows::WindowWrap;
+use crate::shell::windows::WzmWindow;
 
 #[derive(Debug, Default)]
 pub struct NodeMap {
@@ -26,7 +26,7 @@ impl NodeMap {
         })
     }
 
-    pub fn iter_windows(&self) -> impl Iterator<Item = &WindowWrap> {
+    pub fn iter_windows(&self) -> impl Iterator<Item = &WzmWindow> {
         self.items.values().filter_map(|node| match node {
             Node::Window(w) => Some(w),
             _ => None,
@@ -74,7 +74,7 @@ impl NodeMap {
             .items
             .iter()
             .filter_map(|(_k, v)| v.try_into().ok())
-            .filter(|window: &WindowWrap| !window.inner().alive())
+            .filter(|window: &WzmWindow| !window.inner().alive())
             .map(|window| window.id())
             .collect();
 

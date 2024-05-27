@@ -20,6 +20,7 @@ use smithay::wayland::shell::xdg::XdgShellState;
 use smithay::wayland::shm::ShmState;
 use smithay::wayland::socket::ListeningSocketSource;
 use smithay::wayland::xdg_activation::XdgActivationState;
+use smithay::wayland::xdg_foreign::XdgForeignState;
 
 use wzm_config::WzmConfig;
 
@@ -42,6 +43,7 @@ pub struct Wzm {
     pub popups: PopupManager,
     pub xdg_decoration_state: XdgDecorationState,
     pub xdg_activation_state: XdgActivationState,
+    pub xdg_foreign_state: XdgForeignState,
     pub layer_shell_state: WlrLayerShellState,
     pub seat: Seat<Self>,
     // We should use this in calloopdata, not wazm
@@ -73,6 +75,7 @@ impl Wzm {
         let popups = PopupManager::default();
         let xdg_decoration_state = XdgDecorationState::new::<Wzm>(&dh);
         let xdg_activation_state = XdgActivationState::new::<Wzm>(&dh);
+        let xdg_foreign_state = XdgForeignState::new::<Wzm>(&dh);
         let layer_shell_state = WlrLayerShellState::new_with_filter::<Wzm, _>(&dh, |client| {
             !client.get_data::<ClientState>().unwrap().restricted
         });
@@ -111,6 +114,7 @@ impl Wzm {
             popups,
             xdg_decoration_state,
             xdg_activation_state,
+            xdg_foreign_state,
             layer_shell_state,
             seat,
             config: WzmConfig::get().expect("failed to get config"),

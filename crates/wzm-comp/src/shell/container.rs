@@ -7,13 +7,13 @@ use smithay::utils::{Logical, Point, Rectangle, Size};
 
 use smithay::output::Output;
 use smithay::wayland::shell::xdg::ToplevelSurface;
-use tracing::debug;
+use tracing::{debug};
 
 use crate::shell::node;
 use crate::shell::node::Node;
 
 use crate::shell::nodemap::NodeMap;
-use crate::shell::windows::WindowWrap;
+use crate::shell::windows::WzmWindow;
 
 #[derive(Debug, Clone)]
 pub struct ContainerRef {
@@ -104,7 +104,7 @@ pub enum ContainerLayout {
 }
 
 impl Container {
-    pub fn close_window(&mut self) {
+    pub fn close_focused_window(&mut self) {
         let idx = self.get_focused_window().map(|window| {
             debug!("Closing window({:?})", window.id());
             window.send_close();
@@ -168,8 +168,8 @@ impl Container {
         }
     }
 
-    pub fn flatten_window(&self) -> Vec<WindowWrap> {
-        let mut windows: Vec<WindowWrap> = self.nodes.iter_windows().cloned().collect();
+    pub fn flatten_window(&self) -> Vec<WzmWindow> {
+        let mut windows: Vec<WzmWindow> = self.nodes.iter_windows().cloned().collect();
 
         for child in self.nodes.iter_containers() {
             let child = child.get();
@@ -211,7 +211,7 @@ impl Container {
         self.nodes.get_focused()
     }
 
-    pub fn get_focused_window(&self) -> Option<WindowWrap> {
+    pub fn get_focused_window(&self) -> Option<WzmWindow> {
         self.nodes.get_focused().and_then(|node| match node {
             Node::Window(window) => Some(window.clone()),
             _ => None,
@@ -249,13 +249,13 @@ impl Container {
         self.nodes.has_window()
     }
 
-    pub fn insert_window_after(&mut self, target_id: u32, window: WindowWrap) {
+    pub fn insert_window_after(&mut self, target_id: u32, window: WzmWindow) {
         let id = window.id();
         self.nodes.insert_after(target_id, Node::Window(window));
         self.nodes.set_focus(id);
     }
 
-    pub fn insert_window_before(&mut self, target_id: u32, window: WindowWrap) {
+    pub fn insert_window_before(&mut self, target_id: u32, window: WzmWindow) {
         let id = window.id();
         self.nodes.insert_before(target_id, Node::Window(window));
         self.nodes.set_focus(id);
@@ -263,7 +263,7 @@ impl Container {
 
     // Push a window to the tree and update the focus
     pub fn push_toplevel(&mut self, surface: ToplevelSurface) -> u32 {
-        let window = Node::Window(WindowWrap::from(surface));
+        let window = Node::Window(WzmWindow::from(surface));
         match self.get_focused_window() {
             None => self.nodes.push(window),
             Some(focus) => self
@@ -333,7 +333,6 @@ impl Container {
             self.id, zone.size.h, zone.size.w
         );
         let mut redraw = self.nodes.remove_dead_windows();
-
         if self.nodes.spine.is_empty() {
             return false;
         }

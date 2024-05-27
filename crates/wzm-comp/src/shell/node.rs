@@ -1,10 +1,10 @@
 use crate::shell::container::ContainerRef;
-use crate::shell::windows::WindowWrap;
+use crate::shell::windows::WzmWindow;
 
 #[derive(Debug, Clone)]
 pub enum Node {
     Container(ContainerRef),
-    Window(WindowWrap),
+    Window(WzmWindow),
 }
 
 impl Node {
@@ -20,11 +20,11 @@ impl Node {
     }
 }
 
-impl TryInto<WindowWrap> for Node {
+impl TryInto<WzmWindow> for Node {
     // TODO: this error
     type Error = &'static str;
 
-    fn try_into(self) -> Result<WindowWrap, Self::Error> {
+    fn try_into(self) -> Result<WzmWindow, Self::Error> {
         match self {
             Node::Window(w) => Ok(w),
             _ => Err("tried to unwrap a window got a container or a x11 popup"),
@@ -32,11 +32,11 @@ impl TryInto<WindowWrap> for Node {
     }
 }
 
-impl<'a> TryInto<&'a mut WindowWrap> for &'a mut Node {
+impl<'a> TryInto<&'a mut WzmWindow> for &'a mut Node {
     // TODO: this error
     type Error = &'static str;
 
-    fn try_into(self) -> Result<&'a mut WindowWrap, Self::Error> {
+    fn try_into(self) -> Result<&'a mut WzmWindow, Self::Error> {
         match self {
             Node::Window(w) => Ok(w),
             _ => Err("tried to unwrap a window got a container or a x11 popup"),
@@ -44,11 +44,11 @@ impl<'a> TryInto<&'a mut WindowWrap> for &'a mut Node {
     }
 }
 
-impl TryInto<WindowWrap> for &Node {
+impl TryInto<WzmWindow> for &Node {
     // TODO: this error
     type Error = &'static str;
 
-    fn try_into(self) -> Result<WindowWrap, Self::Error> {
+    fn try_into(self) -> Result<WzmWindow, Self::Error> {
         match self {
             Node::Window(w) => Ok(w.clone()),
             _ => Err("tried to unwrap a window got a container or a x11 popup"),
@@ -80,11 +80,11 @@ impl TryInto<ContainerRef> for &Node {
     }
 }
 
-impl<'a> TryInto<&'a WindowWrap> for &'a Node {
+impl<'a> TryInto<&'a WzmWindow> for &'a Node {
     // TODO: this error
     type Error = &'static str;
 
-    fn try_into(self) -> Result<&'a WindowWrap, Self::Error> {
+    fn try_into(self) -> Result<&'a WzmWindow, Self::Error> {
         match self {
             Node::Window(w) => Ok(w),
             _ => Err("tried to unwrap a window got a container or a x11 popup"),

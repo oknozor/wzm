@@ -9,11 +9,7 @@ use smithay::reexports::wayland_server::protocol::wl_seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Rectangle, Serial, SERIAL_COUNTER};
 use smithay::wayland::compositor::with_states;
-use smithay::wayland::shell::xdg::{
-    PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler,
-    XdgShellState, XdgToplevelSurfaceData,
-};
-use tracing::debug;
+use smithay::wayland::shell::xdg::{PopupSurface, PositionerState, ToplevelSurface, XdgPopupSurfaceData, XdgShellHandler, XdgShellState, XdgToplevelSurfaceData};
 
 use crate::grabs::{MoveSurfaceGrab, ResizeSurfaceGrab};
 use crate::input::check_grab;
@@ -25,14 +21,11 @@ impl XdgShellHandler for Wzm {
     }
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        debug!("New toplevel window");
         let workspace = self.get_current_workspace();
         let mut workspace = workspace.get_mut();
-        debug!("new toplevel, mutable ref for WS");
 
         let container = if let Some(layout) = self.next_layout {
             self.next_layout = None;
-            debug!("Creating a new {layout:?} container");
             workspace.create_container(layout)
         } else {
             workspace.get_focus().0
@@ -52,7 +45,6 @@ impl XdgShellHandler for Wzm {
         let serial = SERIAL_COUNTER.next_serial();
         handle.set_focus(self, Some(surface.wl_surface().clone()), serial);
         workspace.needs_redraw = true;
-        debug!("new toplevel, dropped mutable ref for WS");
     }
 
     fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {

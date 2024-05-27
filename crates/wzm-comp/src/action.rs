@@ -8,7 +8,7 @@ use wzm_config::action::Direction;
 
 use crate::shell::container::{ContainerLayout, ContainerState};
 use crate::shell::node::Node;
-use crate::shell::windows::{WindowState, WindowWrap};
+use crate::shell::windows::{WindowState, WzmWindow};
 use crate::Wzm;
 
 impl Wzm {
@@ -76,7 +76,7 @@ impl Wzm {
             let ws = self.get_current_workspace();
             let mut ws = ws.get_mut();
             let container = ws.root().container_having_window(id).unwrap();
-            let window = WindowWrap::from(window);
+            let window = WzmWindow::from(window);
             ws.set_container_and_window_focus(&container, &window);
             self.toggle_window_focus(serial, window.inner());
         }
@@ -91,7 +91,7 @@ impl Wzm {
             }
         });
 
-        let window = WindowWrap::from(window.clone());
+        let window = WzmWindow::from(window.clone());
         let location = self.space.element_bbox(window.inner()).unwrap().loc;
 
         self.space
@@ -157,7 +157,7 @@ impl Wzm {
             let container = self.get_current_workspace().get_mut().get_focus().0;
             let mut container = container.get_mut();
             debug!("Closing window in container: {}", container.id);
-            container.close_window();
+            container.close_focused_window();
             container.state()
         };
 

@@ -66,7 +66,7 @@ impl WindowState {
 }
 
 #[derive(Debug, Clone)]
-pub struct WindowWrap {
+pub struct WzmWindow {
     inner: Window,
 }
 
@@ -76,7 +76,7 @@ pub struct XdgTopLevelAttributes {
     pub title: Option<String>,
 }
 
-impl WindowWrap {
+impl WzmWindow {
     pub fn update_floating(&self, zone: Rectangle<i32, Logical>) -> bool {
         let (size, location) = if self.get_state().configured() {
             let initial_size = self.get_state().initial_size();
@@ -245,23 +245,23 @@ impl WindowWrap {
     }
 }
 
-impl From<ToplevelSurface> for WindowWrap {
+impl From<ToplevelSurface> for WzmWindow {
     fn from(toplevel: ToplevelSurface) -> Self {
         let window = Window::new_wayland_window(toplevel);
         window.user_data().insert_if_missing(WindowState::new);
-        WindowWrap { inner: window }
+        WzmWindow { inner: window }
     }
 }
 
-impl From<Window> for WindowWrap {
+impl From<Window> for WzmWindow {
     fn from(window: Window) -> Self {
-        WindowWrap { inner: window }
+        WzmWindow { inner: window }
     }
 }
 
-impl WindowWrap {
-    pub fn from_x11_window(window: Window) -> WindowWrap {
+impl WzmWindow {
+    pub fn from_x11_window(window: Window) -> WzmWindow {
         window.user_data().insert_if_missing(WindowState::new);
-        WindowWrap { inner: window }
+        WzmWindow { inner: window }
     }
 }

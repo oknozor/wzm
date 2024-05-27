@@ -3,14 +3,14 @@ use crate::shell::container::{Container, ContainerLayout, ContainerRef};
 use crate::shell::node;
 use crate::shell::node::Node;
 use crate::shell::nodemap::NodeMap;
-use crate::shell::windows::WindowWrap;
+use crate::shell::windows::WzmWindow;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::desktop::{layer_map_for_output, Space, Window};
 use smithay::output::Output;
 use smithay::utils::{Logical, Rectangle};
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
-use tracing::debug;
+use tracing::{debug};
 
 #[derive(Debug, Clone)]
 pub struct WorkspaceRef {
@@ -187,7 +187,7 @@ impl Workspace {
         self.root.clone()
     }
 
-    pub fn get_focus(&self) -> (ContainerRef, Option<WindowWrap>) {
+    pub fn get_focus(&self) -> (ContainerRef, Option<WzmWindow>) {
         let window = {
             let c = self.focus.get();
             c.get_focused_window()
@@ -226,15 +226,15 @@ impl Workspace {
     pub fn set_container_and_window_focus(
         &mut self,
         container: &ContainerRef,
-        window: &WindowWrap,
+        window: &WzmWindow,
     ) {
         self.focus = container.clone();
         container.get_mut().set_focus(window.id());
     }
 
-    pub fn flatten_window(&self) -> Vec<WindowWrap> {
+    pub fn flatten_window(&self) -> Vec<WzmWindow> {
         let root = self.root.get();
-        let mut windows: Vec<WindowWrap> = root.nodes.iter_windows().cloned().collect();
+        let mut windows: Vec<WzmWindow> = root.nodes.iter_windows().cloned().collect();
 
         for child in root.nodes.iter_containers() {
             let window = child.get().flatten_window();
