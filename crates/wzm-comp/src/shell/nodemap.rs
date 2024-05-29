@@ -1,7 +1,6 @@
 use smithay::utils::IsAlive;
 use std::collections::hash_map::Iter;
 use std::collections::HashMap;
-use std::num::NonZeroUsize;
 
 use crate::shell::container::ContainerRef;
 use crate::shell::node::Node;
@@ -12,7 +11,6 @@ pub struct NodeMap {
     // The node map
     pub items: HashMap<u32, Node>,
     // Node ids by their drawing order
-    // TODO: consider introducing a NodeIdType here
     pub spine: Vec<u32>,
     // Store the id of the focused window
     focus_idx: Option<usize>,
@@ -88,7 +86,12 @@ impl NodeMap {
         redraw
     }
 
-    pub fn drain_all(&mut self) -> Vec<(u32, Node)> {
+    pub fn drain_all(&mut self) -> impl IntoIterator<Item = (u32, Node)> + '_ {
+        let _ = self.spine.drain(..);
+        self.items.drain()
+    }
+
+    pub fn drain_flat_all(&mut self) -> Vec<(u32, Node)> {
         let mut drained = vec![];
         for id in &self.spine {
             let node = self.items.remove(id).unwrap();
@@ -98,7 +101,7 @@ impl NodeMap {
         for node in &mut self.items.values() {
             if let Node::Container(c) = node {
                 let mut ref_mut = c.get_mut();
-                drained.extend(ref_mut.nodes.drain_all());
+                drained.extend(ref_mut.nodes.drain_flat_all());
             }
         }
 
@@ -106,8 +109,7 @@ impl NodeMap {
     }
 
     pub fn extend(&mut self, other: Vec<(u32, Node)>) {
-        let ids: Vec<u32> = other.iter().map(|(id, _)| *id).collect();
-        self.spine.extend_from_slice(ids.as_slice());
+        self.spine.extend(other.iter().map(|(id, _)| *id));
         self.items.extend(other)
     }
 
@@ -146,13 +148,13 @@ impl NodeMap {
 
     /// Insert a container or a window after the given node id in the spine
     pub fn insert_after(&mut self, id: u32, node: Node) -> Option<u32> {
-        let focus_index = self.spine_index(id);
+        let focus_index = self.spine_index(&id);
 
         if let Some(index) = focus_index {
             let index = index + 1;
             self.spine.insert(index, node.id());
 
-            if !node.is_container() {
+            if node.is_window() {
                 self.set_focus_index(index);
             }
 
@@ -165,7 +167,7 @@ impl NodeMap {
 
     /// Insert a container or a window after the given node id in the spine
     pub fn insert_before(&mut self, id: u32, node: Node) -> Option<u32> {
-        let focus_index = self.spine_index(id);
+        let focus_index = self.spine_index(&id);
 
         if let Some(index) = focus_index {
             self.spine.insert(index, node.id());
@@ -186,18 +188,15 @@ impl NodeMap {
             .and_then(|id| self.items.remove(&id))
     }
 
-    pub fn tiled_element_len(&self) -> Option<NonZeroUsize> {
-        let len = self
-            .items
+    pub fn tiled_element_len(&self) -> usize {
+        self.items
             .values()
             .filter(|node| match node {
                 Node::Container(_) => true,
                 Node::Window(w) if !w.is_floating() => true,
                 _ => false,
             })
-            .count();
-
-        NonZeroUsize::new(len)
+            .count()
     }
 
     pub fn iter(&self) -> Iter<'_, u32, Node> {
@@ -258,16 +257,31 @@ impl NodeMap {
             })
     }
 
+    pub fn node_before(&self, id: &u32) -> Option<Node> {
+        let spine_index = self.spine_index(id)?;
+        if spine_index == 0 {
+            None
+        } else {
+            let id = self.spine[spine_index - 1];
+            self.items.get(&id).cloned()
+        }
+    }
+
     fn set_focus_index(&mut self, idx: usize) {
         debug_assert!(self.spine.get(idx).is_some());
         self.focus_idx = Some(idx)
     }
 
-    fn spine_index(&mut self, id: u32) -> Option<usize> {
+    fn spine_index(&self, id: &u32) -> Option<usize> {
         self.spine
             .iter()
             .enumerate()
-            .find(|(_, node_id)| **node_id == id)
+            .find(|(_, node_id)| *node_id == id)
             .map(|(idx, _)| idx)
+    }
+
+    pub fn remove_first(&mut self) -> Option<Node> {
+        let id = self.spine.remove(0);
+        self.items.remove(&id)
     }
 }

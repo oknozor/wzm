@@ -1,7 +1,7 @@
 use crate::decoration::{BorderShader, CustomRenderElements};
 use crate::shell::container::{Container, ContainerRef, LayoutDirection};
 use crate::shell::node;
-use crate::shell::node::Node;
+use crate::shell::node::{Node, NodeEdge};
 use crate::shell::nodemap::NodeMap;
 use crate::shell::windows::WzmWindow;
 use smithay::backend::renderer::gles::GlesRenderer;
@@ -49,7 +49,7 @@ impl WorkspaceRef {
         let mut size = focused_container.size;
         size.w += 10;
         size.h += 10;
-        let mut loc = focused_container.location;
+        let mut loc = focused_container.loc;
         loc.x -= 5;
         loc.y -= 5;
 
@@ -125,13 +125,14 @@ impl Workspace {
     pub fn new(output: &Output, geometry: Rectangle<i32, Logical>, gaps: i32) -> Workspace {
         let root = Container {
             id: node::id::get(),
-            location: (geometry.loc.x + gaps, geometry.loc.y + gaps).into(),
+            loc: (geometry.loc.x + gaps, geometry.loc.y + gaps).into(),
             size: (geometry.size.w - 2 * gaps, geometry.size.h - 2 * gaps).into(),
             output: output.clone(),
             parent: None,
             nodes: NodeMap::default(),
             layout: LayoutDirection::Horizontal,
             gaps,
+            edges: NodeEdge::default(),
         };
 
         let root = ContainerRef::new(root);
@@ -148,13 +149,9 @@ impl Workspace {
     }
 
     pub fn update_layout(&mut self) {
-        let zone = self.non_exclusive_zone();
         let root = &self.root;
-        let mut root = root.get_mut();
-        root.size = (zone.size.w - 2 * self.gaps, zone.size.h - 2 * self.gaps).into();
-        root.location = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
-
-        self.needs_redraw = root.update_layout(zone);
+        let root = root.get();
+        root.update_layout();
     }
 
     pub fn redraw(&mut self, space: &mut Space<Window>) {
@@ -202,7 +199,9 @@ impl Workspace {
             let (container, _) = self.get_focus();
             let parent = container.clone();
             let mut current = container.get_mut();
-            current.create_child(layout, parent, self.gaps)
+            let child = current.create_child(layout, parent, self.gaps);
+            current.update_layout();
+            child
         };
 
         self.focus = child.clone();
@@ -217,6 +216,7 @@ impl Workspace {
             self.focus = parent.clone();
             let mut parent = parent.get_mut();
             parent.nodes.remove(&id);
+            parent.update_layout();
         }
     }
 
@@ -265,7 +265,7 @@ impl Workspace {
     pub fn reset_gaps(&self) {
         let zone = self.non_exclusive_zone();
         let mut container = self.root.get_mut();
-        container.location = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
+        container.loc = (zone.loc.x + self.gaps, zone.loc.y + self.gaps).into();
         container.size = (zone.size.w - 2 * self.gaps, zone.size.h - 2 * self.gaps).into();
     }
 

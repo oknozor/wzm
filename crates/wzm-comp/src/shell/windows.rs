@@ -1,13 +1,16 @@
-use crate::shell::{node, FLOATING_Z_INDEX, TILING_Z_INDEX};
+use std::cell::{RefCell, RefMut};
+use std::fmt::Debug;
+use std::sync::Mutex;
+
 use smithay::desktop::{Space, Window};
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::Resource;
 use smithay::utils::{Logical, Point, Rectangle, Size};
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::{ToplevelSurface, XdgToplevelSurfaceRoleAttributes};
-use std::cell::RefCell;
-use std::fmt::Debug;
-use std::sync::Mutex;
+
+use crate::shell::node::NodeEdge;
+use crate::shell::{node, FLOATING_Z_INDEX, TILING_Z_INDEX};
 
 #[derive(Debug, Clone)]
 pub struct WindowState {
@@ -15,8 +18,10 @@ pub struct WindowState {
     floating: RefCell<bool>,
     configured: RefCell<bool>,
     initial_size: RefCell<Size<i32, Logical>>,
+    _ratio: RefCell<f32>,
     size: RefCell<Size<i32, Logical>>,
     loc: RefCell<Point<i32, Logical>>,
+    edges: RefCell<NodeEdge>,
 }
 
 impl WindowState {
@@ -26,8 +31,10 @@ impl WindowState {
             floating: RefCell::new(false),
             configured: RefCell::new(false),
             initial_size: RefCell::new(Default::default()),
+            _ratio: RefCell::new(1.0),
             size: RefCell::new(Default::default()),
             loc: RefCell::new(Default::default()),
+            edges: RefCell::new(Default::default()),
         }
     }
 
@@ -37,6 +44,10 @@ impl WindowState {
 
     pub fn loc(&self) -> Point<i32, Logical> {
         *self.loc.borrow()
+    }
+
+    pub fn edges(&self) -> RefMut<'_, NodeEdge> {
+        self.edges.borrow_mut()
     }
 
     pub fn is_floating(&self) -> bool {
@@ -215,6 +226,10 @@ impl WzmWindow {
 
     pub fn is_floating(&self) -> bool {
         self.get_state().is_floating()
+    }
+
+    pub fn edges_mut(&self) -> RefMut<'_, NodeEdge> {
+        self.get_state().edges()
     }
 
     pub fn z_index(&self) -> u8 {

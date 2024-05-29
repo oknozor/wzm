@@ -5,6 +5,7 @@ use tracing::debug;
 
 use crate::grabs::MoveSurfaceGrab;
 use wzm_config::action::Direction;
+use wzm_config::keybinding::Mode;
 
 use crate::shell::container::{ContainerState, LayoutDirection};
 use crate::shell::node::Node;
@@ -27,9 +28,7 @@ impl Wzm {
 
         if let Some(window) = focus.1 {
             window.toggle_floating();
-            let zone = ws.non_exclusive_zone();
-            let redraw = focus.0.get_mut().update_layout(zone);
-            ws.needs_redraw = redraw;
+            ws.needs_redraw = true;
         }
     }
 
@@ -39,7 +38,6 @@ impl Wzm {
 
         if ws.fullscreen_layer.is_some() {
             ws.fullscreen_layer = None;
-            ws.update_layout();
         } else {
             let (_c, window) = ws.get_focus();
             if let Some(window) = window {
@@ -56,7 +54,6 @@ impl Wzm {
         if ws.fullscreen_layer.is_some() {
             ws.reset_gaps();
             ws.fullscreen_layer = None;
-            ws.update_layout();
         } else {
             let (container, _) = ws.get_focus();
             let zone = ws.non_exclusive_zone();
@@ -171,48 +168,31 @@ impl Wzm {
                     self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
                 }
             }
+
             ContainerState::HasContainersOnly => {
-                debug!("Draining window from container");
-                {
-                    let container = {
-                        let ws = self.get_current_workspace();
-                        let ws = &ws.get_mut();
-                        ws.get_focus().0
-                    };
-
-                    let children: Option<Vec<(u32, Node)>> = {
-                        let mut container = container.get_mut();
-                        if container.parent.is_some() {
-                            Some(container.nodes.drain_all())
-                        } else {
-                            None
-                        }
-                    };
-
-                    let mut container = container.get_mut();
-                    let id = container.id;
-
-                    if let (Some(parent), Some(children)) = (&mut container.parent, children) {
-                        let mut parent = parent.get_mut();
-                        parent.nodes.remove(&id);
-                        parent.nodes.extend(children);
-                    }
-                }
-
                 let ws = self.get_current_workspace();
                 let ws = ws.get();
+                let container = ws.get_focused_container();
+                let mut container = container.get_mut();
 
-                if let Some(window) = ws.get_focus().1 {
-                    self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
-                }
+                let Some(Node::Container(first)) = container.nodes.remove_first() else {
+                    panic!("first child must be a container");
+                };
+
+                let mut first = first.get_mut();
+                let orphans = first.nodes.drain_all().into_iter().collect();
+                container.layout = first.layout;
+                container.nodes.extend(orphans);
+                container.update_layout();
             }
+
             ContainerState::HasWindows => {
                 let ws = self.get_current_workspace();
                 let ws = ws.get();
-
                 if let Some(window) = ws.get_focus().1 {
                     self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
                 }
+
                 debug!("Cannot remove non empty container");
             }
         };
@@ -233,8 +213,6 @@ impl Wzm {
                 workspace.needs_redraw = true;
             }
         }
-
-        workspace.update_layout();
     }
 
     pub fn move_window(&mut self, direction: Direction) {
@@ -311,10 +289,6 @@ impl Wzm {
             let mut ws = ws.get_mut();
             ws.set_container_focused(&new_focus);
         }
-
-        let ws = self.get_current_workspace();
-        let mut ws = ws.get_mut();
-        ws.update_layout();
     }
 
     pub fn move_request_server(&mut self, serial: Serial, button_used: u32) {
@@ -346,5 +320,63 @@ impl Wzm {
         };
 
         pointer.set_grab(self, grab, serial, Focus::Clear);
+    }
+
+    pub fn toggle_resize(&mut self) {
+        self.current_mode = match self.current_mode {
+            Mode::Normal => Mode::Resize,
+            Mode::Resize => Mode::Normal,
+        };
+        println!("Resize mode {}", self.resize_mode());
+    }
+
+    pub fn resize(&mut self, direction: Direction) {
+        const RESIZE_STEP: i32 = 10;
+
+        println!("Resize {:?}", direction);
+
+        let ws = self.get_current_workspace();
+        let ws = ws.get_mut();
+        if let (_, Some(w)) = ws.get_focus() {
+            let mut size = w.size();
+            let mut loc = w.loc();
+
+            let edges = w.edges_mut();
+
+            match direction {
+                Direction::Left => {
+                    if let Some(_left) = &edges.left {
+                        size.w += RESIZE_STEP;
+                        loc.x -= RESIZE_STEP;
+                    } else {
+                        size.w -= RESIZE_STEP;
+                    }
+                }
+                Direction::Right => {
+                    if let Some(_right) = &edges.right {
+                        size.w += RESIZE_STEP;
+                    } else {
+                        size.w -= RESIZE_STEP;
+                    }
+                }
+                Direction::Up => {
+                    if let Some(_up) = &edges.up {
+                        size.h += RESIZE_STEP;
+                        loc.y -= RESIZE_STEP;
+                    } else {
+                        size.h -= RESIZE_STEP;
+                    }
+                }
+                Direction::Down => {
+                    if let Some(_down) = &edges.down {
+                        size.h += RESIZE_STEP;
+                    } else {
+                        size.h -= RESIZE_STEP;
+                    }
+                }
+            }
+
+            w.update_loc_and_size(Some(size), loc);
+        }
     }
 }

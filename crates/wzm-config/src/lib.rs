@@ -39,6 +39,7 @@ impl Default for WzmConfig {
                         env: vec![],
                         command: "alacritty".to_string(),
                     },
+                    mode: Default::default(),
                 },
                 KeyBinding {
                     modifiers: HashSet::from([Modifier::Alt]),
@@ -47,6 +48,7 @@ impl Default for WzmConfig {
                         env: vec![("WGPU_BACKEND".into(), "vulkan".into())],
                         command: "onagre".to_string(),
                     },
+                    mode: Default::default(),
                 },
             ],
         }

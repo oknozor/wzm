@@ -14,13 +14,27 @@ pub struct KeyBinding {
     #[serde(deserialize_with = "deserialize_key")]
     pub key: Keysym,
     pub action: Action,
+    #[serde(default)]
+    pub mode: Mode,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize, Default)]
+pub enum Mode {
+    #[default]
+    Normal,
+    Resize,
 }
 
 impl KeyBinding {
-    pub fn match_action(&self, modifiers: ModifiersState, key: Keysym) -> Option<Action> {
+    pub fn match_action(
+        &self,
+        modifiers: ModifiersState,
+        key: Keysym,
+        mode: Mode,
+    ) -> Option<Action> {
         let state: ModifiersState = self.into();
 
-        if match_modifier(state, modifiers) && key == self.key {
+        if match_modifier(state, modifiers) && key == self.key && mode == self.mode {
             Some(self.action.clone())
         } else {
             None
@@ -81,6 +95,11 @@ pub enum Action {
     LayoutVertical,
     LayoutHorizontal,
     ToggleFloating,
+    ToggleResize,
+    ResizeLeft,
+    ResizeRight,
+    ResizeUp,
+    ResizeDown,
     Run {
         env: Vec<(String, String)>,
         command: String,
@@ -113,6 +132,11 @@ impl From<Action> for KeyAction {
             Action::Quit => KeyAction::Quit,
             Action::ToggleFullScreenWindow => KeyAction::ToggleFullScreenWindow,
             Action::ToggleFullScreenContainer => KeyAction::ToggleFullScreenContainer,
+            Action::ToggleResize => KeyAction::ToggleResize,
+            Action::ResizeLeft => KeyAction::ResizeLeft,
+            Action::ResizeRight => KeyAction::ResizeRight,
+            Action::ResizeUp => KeyAction::ResizeUp,
+            Action::ResizeDown => KeyAction::ResizeDown,
         }
     }
 }
@@ -215,6 +239,7 @@ mod test {
                     env: vec![],
                     command: "alacritty".to_string(),
                 },
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
@@ -223,51 +248,61 @@ mod test {
                     env: vec![("WGPU_BACKEND".into(), "vulkan".into())],
                     command: "onagre".to_string(),
                 },
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::a,
                 action: Action::CloseWindow,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::v,
                 action: Action::LayoutVertical,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::d,
                 action: Action::LayoutHorizontal,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Ctrl, Modifier::Shift]),
                 key: Keysym::space,
                 action: Action::ToggleFloating,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::k,
                 action: Action::MoveFocusUp,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::h,
                 action: Action::MoveFocusLeft,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::l,
                 action: Action::MoveFocusRight,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::j,
                 action: Action::MoveFocusDown,
+                mode: Default::default(),
             },
             KeyBinding {
                 modifiers: HashSet::from([Modifier::Alt]),
                 key: Keysym::k,
                 action: Action::MoveFocusUp,
+                mode: Default::default(),
             },
         ];
 

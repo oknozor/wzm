@@ -16,7 +16,8 @@ use std::io;
 use std::os::unix::prelude::CommandExt;
 use std::process::{Command, Stdio};
 use tracing::{debug, warn};
-use wzm_config::action::KeyAction;
+use wzm_config::action::{Direction, KeyAction};
+use wzm_config::keybinding;
 use wzm_config::keybinding::Action;
 use xkbcommon::xkb::keysyms::{KEY_XF86Switch_VT_1, KEY_XF86Switch_VT_12};
 
@@ -26,6 +27,10 @@ impl Wzm {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
             InputEvent::Keyboard { event } => match self.keyboard_key_to_action::<I>(event) {
+                KeyAction::ResizeLeft if self.resize_mode() => self.resize(Direction::Left),
+                KeyAction::ResizeRight if self.resize_mode() => self.resize(Direction::Right),
+                KeyAction::ResizeUp if self.resize_mode() => self.resize(Direction::Up),
+                KeyAction::ResizeDown if self.resize_mode() => self.resize(Direction::Down),
                 KeyAction::Run(cmd, env) => spawn(cmd, env),
                 KeyAction::ScaleUp => {}
                 KeyAction::ScaleDown => {}
@@ -46,6 +51,13 @@ impl Wzm {
                 KeyAction::CloseWindow => self.close(),
                 KeyAction::Quit => {}
                 KeyAction::None => {}
+                KeyAction::ToggleResize => self.toggle_resize(),
+                KeyAction::ResizeLeft
+                | KeyAction::ResizeRight
+                | KeyAction::ResizeUp
+                | KeyAction::ResizeDown => {
+                    // Noop
+                }
             },
             InputEvent::PointerMotion { .. } => {}
             InputEvent::PointerMotionAbsolute { event, .. } => {
@@ -117,6 +129,7 @@ impl Wzm {
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
         let keyboard = self.seat.get_keyboard().unwrap();
+        let mode = self.current_mode;
 
         keyboard
             .input(
@@ -134,10 +147,10 @@ impl Wzm {
                         }
                         KeyState::Pressed if modifiers.alt => {
                             app_state.mod_pressed = true;
-                            Self::key_pressed_to_action(app_state, modifiers, keysym)
+                            Self::key_pressed_to_action(app_state, modifiers, keysym, mode)
                         }
                         KeyState::Pressed => {
-                            Self::key_pressed_to_action(app_state, modifiers, keysym)
+                            Self::key_pressed_to_action(app_state, modifiers, keysym, mode)
                         }
                         _ => FilterResult::Forward,
                     }
@@ -150,12 +163,13 @@ impl Wzm {
         app_state: &mut Wzm,
         modifiers: &ModifiersState,
         keysym: Keysym,
+        mode: keybinding::Mode,
     ) -> FilterResult<KeyAction> {
         let action = app_state
             .config
             .keybindings
             .iter()
-            .find_map(|binding| binding.match_action(*modifiers, keysym))
+            .find_map(|binding| binding.match_action(*modifiers, keysym, mode))
             .map(Action::into)
             .map(FilterResult::Intercept);
 

@@ -41,3 +41,18 @@ impl CalloopData {
         dbg!(&self.wzm.socket_name);
     }
 }
+
+#[cfg(test)]
+mod arch_test {
+    use archunit_rs::rule::{ArchRuleBuilder, CheckRule};
+    use archunit_rs::{ExludeModules, Structs};
+
+    #[test]
+    fn test() {
+        Structs::that(ExludeModules::default())
+            .have_name_matching("Container")
+            .should()
+            .only_have_private_fields()
+            .check();
+    }
+}

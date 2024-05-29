@@ -37,6 +37,8 @@ impl XdgShellHandler for Wzm {
         {
             let mut container = container.get_mut();
             container.push_toplevel(surface.clone());
+            container.update_layout();
+            container.update_inner_edges();
         }
 
         // Grab keyboard focus

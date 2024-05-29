@@ -7,9 +7,21 @@ pub enum Node {
     Window(WzmWindow),
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct NodeEdge {
+    pub left: Option<Node>,
+    pub right: Option<Node>,
+    pub up: Option<Node>,
+    pub down: Option<Node>,
+}
+
 impl Node {
     pub fn is_container(&self) -> bool {
         matches!(self, Node::Container(_))
+    }
+
+    pub fn is_window(&self) -> bool {
+        matches!(self, Node::Window(_))
     }
 
     pub fn id(&self) -> u32 {

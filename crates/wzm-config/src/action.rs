@@ -22,6 +22,11 @@ pub enum KeyAction {
     CloseWindow,
     Quit,
     None,
+    ToggleResize,
+    ResizeLeft,
+    ResizeRight,
+    ResizeUp,
+    ResizeDown,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]

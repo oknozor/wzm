@@ -22,7 +22,7 @@ use smithay::wayland::socket::ListeningSocketSource;
 use smithay::wayland::xdg_activation::XdgActivationState;
 use smithay::wayland::xdg_foreign::XdgForeignState;
 
-use wzm_config::WzmConfig;
+use wzm_config::{keybinding, WzmConfig};
 
 use crate::shell::container::LayoutDirection;
 use crate::shell::workspace::WorkspaceRef;
@@ -51,6 +51,7 @@ pub struct Wzm {
 
     // Shell
     pub mod_pressed: bool,
+    pub current_mode: keybinding::Mode,
     pub workspaces: HashMap<u8, WorkspaceRef>,
     pub current_workspace: u8,
     pub next_layout: Option<LayoutDirection>,
@@ -119,6 +120,7 @@ impl Wzm {
             seat,
             config: WzmConfig::get().expect("failed to get config"),
             mod_pressed: false,
+            current_mode: Default::default(),
             workspaces: Default::default(),
             current_workspace: 0,
             next_layout: None,
@@ -177,6 +179,10 @@ impl Wzm {
                     .surface_under(pos - location.to_f64(), WindowSurfaceType::ALL)
                     .map(|(s, p)| (s, p + location))
             })
+    }
+
+    pub fn resize_mode(&self) -> bool {
+        matches!(self.current_mode, keybinding::Mode::Resize)
     }
 }
 
