@@ -1,3 +1,4 @@
+use crate::keybinding::{ResizeDirection, ResizeType};
 use smithay::utils::{Logical, Point};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -15,6 +16,7 @@ pub enum KeyAction {
     MoveFocus(Direction),
     Run(String, Vec<(String, String)>),
     MoveToWorkspace(u8),
+    ToggleSwitchLayout,
     LayoutVertical,
     LayoutHorizontal,
     ToggleFloating,
@@ -23,10 +25,7 @@ pub enum KeyAction {
     Quit,
     None,
     ToggleResize,
-    ResizeLeft,
-    ResizeRight,
-    ResizeUp,
-    ResizeDown,
+    Resize(ResizeType, ResizeDirection, u32),
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -44,6 +43,15 @@ impl Direction {
             Direction::Right => p.x += 1.0,
             Direction::Up => p.y -= 1.0,
             Direction::Down => p.y += 1.0,
+        }
+    }
+
+    pub fn invert(&self) -> Direction {
+        match self {
+            Direction::Left => Direction::Right,
+            Direction::Right => Direction::Left,
+            Direction::Up => Direction::Down,
+            Direction::Down => Direction::Up,
         }
     }
 }

@@ -47,8 +47,7 @@ impl CompositorHandler for Wzm {
 
     fn destroyed(&mut self, _: &WlSurface) {
         let ws = self.get_current_workspace();
-        let mut ws = ws.get_mut();
-        ws.update_layout();
+        // ws.update_layout();
     }
 }
 

@@ -1,5 +1,3 @@
-use crate::shell::windows::WindowState;
-use nix::libc;
 use smithay::backend::input::{
     AbsolutePositionEvent, Axis, AxisSource, ButtonState, Event, InputBackend, InputEvent,
     KeyState, KeyboardKeyEvent, MouseButton, PointerAxisEvent, PointerButtonEvent,
@@ -12,25 +10,22 @@ use smithay::input::Seat;
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::reexports::wayland_server::Resource;
 use smithay::utils::{Serial, SERIAL_COUNTER};
-use std::io;
-use std::os::unix::prelude::CommandExt;
-use std::process::{Command, Stdio};
-use tracing::{debug, warn};
-use wzm_config::action::{Direction, KeyAction};
-use wzm_config::keybinding;
-use wzm_config::keybinding::Action;
 use xkbcommon::xkb::keysyms::{KEY_XF86Switch_VT_1, KEY_XF86Switch_VT_12};
 
+use wzm_config::action::KeyAction;
+use wzm_config::keybinding;
+use wzm_config::keybinding::Action;
+
+use crate::action::spawn;
 use crate::state::Wzm;
 
 impl Wzm {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
             InputEvent::Keyboard { event } => match self.keyboard_key_to_action::<I>(event) {
-                KeyAction::ResizeLeft if self.resize_mode() => self.resize(Direction::Left),
-                KeyAction::ResizeRight if self.resize_mode() => self.resize(Direction::Right),
-                KeyAction::ResizeUp if self.resize_mode() => self.resize(Direction::Up),
-                KeyAction::ResizeDown if self.resize_mode() => self.resize(Direction::Down),
+                KeyAction::Resize(kind, direction, amount) if self.resize_mode() => {
+                    self.resize(kind, direction, amount)
+                }
                 KeyAction::Run(cmd, env) => spawn(cmd, env),
                 KeyAction::ScaleUp => {}
                 KeyAction::ScaleDown => {}
@@ -39,7 +34,7 @@ impl Wzm {
                 KeyAction::ToggleTint => {}
                 KeyAction::TogglePreview => {}
                 KeyAction::ToggleFullScreenWindow => self.toggle_fullscreen_window(),
-                KeyAction::ToggleFullScreenContainer => self.toggle_fullscreen_container(),
+                KeyAction::ToggleFullScreenContainer => {}
                 KeyAction::MoveWindow(direction) => self.move_window(direction),
                 KeyAction::MoveContainer(_) => {}
                 KeyAction::MoveFocus(direction) => self.move_focus(direction),
@@ -52,10 +47,8 @@ impl Wzm {
                 KeyAction::Quit => {}
                 KeyAction::None => {}
                 KeyAction::ToggleResize => self.toggle_resize(),
-                KeyAction::ResizeLeft
-                | KeyAction::ResizeRight
-                | KeyAction::ResizeUp
-                | KeyAction::ResizeDown => {
+                KeyAction::ToggleSwitchLayout => self.toggle_layout(),
+                KeyAction::Resize(..) => {
                     // Noop
                 }
             },
@@ -206,12 +199,10 @@ impl Wzm {
 
             match maybe_under_pointer {
                 Some((window, _)) => {
-                    let workspace_ref = self.get_current_workspace();
-                    let mut ws = workspace_ref.get_mut();
-                    let id = window.user_data().get::<WindowState>().unwrap().id();
-                    let container = ws.root().container_having_window(id).unwrap();
-                    ws.set_container_focused(&container);
-                    container.get_mut().set_focus(id);
+                    let workspace = self.get_current_workspace();
+                    let mut workspace = workspace.borrow_mut();
+
+                    workspace.set_focus_matching(&window);
 
                     self.space.raise_element(&window, true);
                     keyboard.set_focus(
@@ -244,49 +235,6 @@ impl Wzm {
             },
         );
         pointer.frame(self);
-    }
-}
-
-/// Spawns the command to run independently of the compositor.
-pub fn spawn(cmd: String, env: Vec<(String, String)>) {
-    debug!("spawning command: {cmd}, {env:?}");
-
-    let mut process = Command::new(&cmd);
-    process
-        .envs(env)
-        .stdin(Stdio::null())
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit());
-
-    unsafe {
-        // Double-fork to avoid having to waitpid the child.
-        process.pre_exec(move || {
-            match libc::fork() {
-                -1 => return Err(io::Error::last_os_error()),
-                0 => (),
-                _ => libc::_exit(0),
-            }
-
-            Ok(())
-        });
-    }
-
-    let mut child = match process.spawn() {
-        Ok(child) => child,
-        Err(err) => {
-            panic!("error spawning {cmd:?}: {err:?}");
-        }
-    };
-
-    match child.wait() {
-        Ok(status) => {
-            if !status.success() {
-                warn!("child did not exit successfully: {status:?}");
-            }
-        }
-        Err(err) => {
-            warn!("error waiting for child: {err:?}");
-        }
     }
 }
 

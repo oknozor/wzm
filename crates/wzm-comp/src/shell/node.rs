@@ -9,10 +9,14 @@ pub enum Node {
 
 #[derive(Debug, Default, Clone)]
 pub struct NodeEdge {
-    pub left: Option<Node>,
-    pub right: Option<Node>,
-    pub up: Option<Node>,
-    pub down: Option<Node>,
+    pub before: Option<Node>,
+    pub after: Option<Node>,
+}
+
+impl NodeEdge {
+    pub fn split(&mut self) -> (&mut Option<Node>, &mut Option<Node>) {
+        (&mut self.before, &mut self.after)
+    }
 }
 
 impl Node {
@@ -22,6 +26,40 @@ impl Node {
 
     pub fn is_window(&self) -> bool {
         matches!(self, Node::Window(_))
+    }
+
+    pub fn ratio(&self) -> Option<f32> {
+        match self {
+            Node::Container(c) => {
+                let c = c.get();
+                c.ratio
+            }
+            Node::Window(w) => w.ratio()
+        }
+    }
+
+    pub fn reset_ratio(&mut self) {
+        match self {
+            Node::Container(c) => {
+                let mut c = c.get_mut();
+                c.ratio = None
+            }
+            Node::Window(c) => {
+                c.get_state().reset_ratio();
+            }
+        }
+    }
+
+    pub fn set_ratio(&mut self, ratio: f32) {
+        match self {
+            Node::Container(c) => {
+                let mut c = c.get_mut();
+                c.ratio = Some(ratio)
+            }
+            Node::Window(c) => {
+                c.get_state().set_ratio(ratio)
+            }
+        }
     }
 
     pub fn id(&self) -> u32 {
@@ -117,8 +155,9 @@ impl<'a> TryInto<&'a ContainerRef> for &'a Node {
 }
 
 pub mod id {
-    use once_cell::sync::Lazy;
     use std::sync::{Arc, Mutex};
+
+    use once_cell::sync::Lazy;
 
     static NODE_ID_COUNTER: Lazy<Arc<Mutex<u32>>> = Lazy::new(|| Arc::new(Mutex::new(0)));
 

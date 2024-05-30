@@ -2,15 +2,14 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 
 use smithay::desktop::{Space, Window};
-use smithay::utils::{Logical, Point, Rectangle, Size};
-
 use smithay::output::Output;
+use smithay::utils::{Logical, Point, Rectangle, Size};
 use smithay::wayland::shell::xdg::ToplevelSurface;
-use tracing::debug;
+
+use wzm_config::keybinding::{ResizeDirection, ResizeType};
 
 use crate::shell::node;
 use crate::shell::node::{Node, NodeEdge};
-
 use crate::shell::nodemap::NodeMap;
 use crate::shell::windows::WzmWindow;
 
@@ -56,11 +55,11 @@ impl ContainerRef {
                 .get(id)
                 .and_then(|node| node.try_into().ok())
         }
-        .or_else(|| {
-            this.nodes
-                .iter_containers()
-                .find_map(|c| c.find_container_by_id(id))
-        })
+            .or_else(|| {
+                this.nodes
+                    .iter_containers()
+                    .find_map(|c| c.find_container_by_id(id))
+            })
     }
 
     pub fn childs_containers(&self) -> Vec<ContainerRef> {
@@ -87,7 +86,49 @@ pub struct Container {
     pub nodes: NodeMap,
     pub layout: LayoutDirection,
     pub gaps: i32,
+    pub ratio: Option<f32>,
     pub edges: NodeEdge,
+}
+
+impl Container {
+    pub fn print_recursive(&self, d: usize) {
+        for _ in 0..d {
+            print!(" ")
+        };
+
+        let (b, a) = {
+            let e = &self.edges;
+            let b = e.after.as_ref()
+                .map(|e| format!("before = {}", e.id())).unwrap_or("".to_string());
+            let a = e.before.as_ref().map(|e| format!("after = {}", e.id())).unwrap_or("".to_string());
+            (b, a)
+        };
+
+        println!("-> Container({:?}) {}, {b} {a}", self.layout, self.id);
+        for (i, n) in self.nodes.iter_spine() {
+            for _ in 0..d {
+                print!(" ")
+            };
+
+            match n {
+                Node::Container(c) => {
+                    c.get().print_recursive(d + 1);
+                }
+                Node::Window(w) => {
+                    let (b, a) = {
+                        let e = w.edges();
+                        let b = e.after.as_ref()
+                            .map(|e| format!("before = {}", e.id())).unwrap_or("".to_string());
+                        let a = e.before.as_ref().map(|e| format!("after = {}", e.id())).unwrap_or("".to_string());
+                        (b, a)
+                    };
+                    print!("Window({i}) {b} {a}");
+                }
+            }
+
+            println!()
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -97,10 +138,19 @@ pub enum ContainerState {
     HasWindows,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum LayoutDirection {
     Vertical,
     Horizontal,
+}
+
+impl From<ResizeDirection> for LayoutDirection {
+    fn from(value: ResizeDirection) -> Self {
+        match value {
+            ResizeDirection::Height => LayoutDirection::Vertical,
+            ResizeDirection::Width => LayoutDirection::Horizontal,
+        }
+    }
 }
 
 impl Container {
@@ -108,8 +158,20 @@ impl Container {
         if let Some(window) = self.get_focused_window() {
             window.send_close();
             let id = window.id();
-            debug!("Removing window({:?}) from the tree", id);
-            let _surface = self.nodes.remove(&id);
+            let (len, _) = self.default_child_ratio();
+
+            let remaining_ratio = self.nodes.remove(&id)
+                .and_then(|s| s.ratio())
+                .map(|ratio| ratio / (len - 1) as f32);
+
+            if let Some(remains) = remaining_ratio {
+                for node in self.nodes.iter_mut() {
+                    if let Some(ratio) = node.ratio() {
+                        node.set_ratio(ratio + remains)
+                    }
+                }
+            }
+
             self.update_layout()
         }
     }
@@ -117,24 +179,24 @@ impl Container {
     pub fn create_child(
         &mut self,
         direction: LayoutDirection,
-        parent: ContainerRef,
+        this: ContainerRef,
         gaps: i32,
     ) -> ContainerRef {
         if self.nodes.spine.len() <= 1 {
             self.layout = direction;
-            parent
+            this
         } else {
             let child_id = node::id::next();
-
             let child = Container {
                 id: child_id,
                 loc: (0, 0).into(),
                 size: (0, 0).into(),
                 output: self.output.clone(),
-                parent: Some(parent.clone()),
+                parent: Some(this.clone()),
                 nodes: NodeMap::default(),
                 layout: direction,
                 gaps,
+                ratio: None,
                 edges: NodeEdge::default(),
             };
 
@@ -143,6 +205,11 @@ impl Container {
             // if the current node contains focus we insert the new node
             // after the focused one
             if let Some(focus) = self.get_focused_window() {
+                let mut edges = focus.edges_mut();
+                let (before, after) = (edges.before.clone(), edges.after.clone());
+                edges.before = None;
+                edges.after = None;
+
                 let focus_id = focus.id();
                 self.nodes
                     .insert_after(focus_id, Node::Container(child_ref.clone()));
@@ -152,28 +219,17 @@ impl Container {
                     .remove(&focus_id)
                     .expect("Focused window node should exists");
 
-                let before = self.nodes.node_before(&child_id);
                 let mut child_mut = child_ref.get_mut();
 
-                match self.layout {
-                    LayoutDirection::Vertical => {
-                        child_mut.edges.up = Some(focus.clone());
-                        child_mut.edges.down = before;
-                        child_mut.edges.left.clone_from(&self.edges.left);
-                        child_mut.edges.right.clone_from(&self.edges.right);
-                    }
-
-                    LayoutDirection::Horizontal => {
-                        child_mut.edges.left = Some(focus.clone());
-                        child_mut.edges.right = before;
-                        child_mut.edges.up.clone_from(&self.edges.up);
-                        child_mut.edges.down.clone_from(&self.edges.down);
-                    }
-                }
-
+                child_mut.edges.before = before;
+                child_mut.edges.after = after;
                 child_mut.nodes.push(focus);
             } else {
-                // otherwise append the new node
+                let before = self.nodes.node_before(&child_id);
+                let after = self.nodes.node_after(&child_id);
+                let mut child_mut = child_ref.get_mut();
+                child_mut.edges.before = before;
+                child_mut.edges.after = after;
                 self.nodes.push(Node::Container(child_ref.clone()));
             }
 
@@ -228,7 +284,7 @@ impl Container {
         let window = WzmWindow::from(surface);
         let node = Node::Window(window.clone());
 
-        match self.get_focused_window() {
+        let id = match self.get_focused_window() {
             None => {
                 self.nodes.push(node);
                 window.id()
@@ -237,13 +293,23 @@ impl Container {
                 .nodes
                 .insert_after(focus.id(), node)
                 .expect("Should insert window"),
+        };
+
+        let (len, default_ratio) = self.default_child_ratio();
+
+        let shrink_ratio = default_ratio / len as f32;
+
+        for node in self.nodes.iter_mut() {
+            if let Some(ratio) = node.ratio() {
+                node.set_ratio(ratio - shrink_ratio)
+            }
         }
+
+        id
     }
 
-    fn get_base_size(&self) -> Size<i32, Logical> {
-        let current_len = self.nodes.tiled_element_len();
-        let ratio = 1.0 / current_len as f32;
-        let total_gaps = (current_len - 1) as i32 * self.gaps;
+    fn compute_size(&self, ratio: f32, total_items: i32) -> Size<i32, Logical> {
+        let total_gaps = (total_items - 1) * self.gaps;
         let base_size: Size<i32, Logical> = match self.layout {
             LayoutDirection::Vertical => {
                 let w = self.size.w;
@@ -259,28 +325,41 @@ impl Container {
         base_size
     }
 
+    pub fn default_child_ratio(&self) -> (i32, f32) {
+        let current_len = self.nodes.tiled_element_len();
+        let ratio = 1.0 / current_len as f32;
+        (current_len as i32, ratio)
+    }
+
     pub fn update_layout(&self) {
-        let base_size = self.get_base_size();
+        let (total_item, default_ratio) = self.default_child_ratio();
         let mut loc = self.loc;
 
         for (_, node) in self.nodes.iter_spine() {
-            match node {
+            let updated_size = match node {
                 Node::Container(c) => {
                     let mut c = c.get_mut();
-                    if (c.size != base_size) || (c.loc != loc) {
-                        c.size = base_size;
+                    let ratio = c.ratio.unwrap_or(default_ratio);
+                    let size = self.compute_size(ratio, total_item);
+
+                    if (c.size != size) || (c.loc != loc) {
+                        c.size = size;
                         c.loc = loc;
                         c.update_layout();
                     }
+                    size
                 }
                 Node::Window(w) => {
-                    w.update_loc_and_size(Some(base_size), loc);
+                    let ratio = w.ratio().unwrap_or(default_ratio);
+                    let size = self.compute_size(ratio, total_item);
+                    w.update_loc_and_size(Some(size), loc);
+                    size
                 }
-            }
+            };
 
             match self.layout {
-                LayoutDirection::Vertical => loc.y += base_size.h + self.gaps,
-                LayoutDirection::Horizontal => loc.x += base_size.w + self.gaps,
+                LayoutDirection::Vertical => loc.y += updated_size.h + self.gaps,
+                LayoutDirection::Horizontal => loc.x += updated_size.w + self.gaps,
             }
         }
     }
@@ -340,48 +419,58 @@ impl Container {
     }
 
     pub fn update_inner_edges(&mut self) {
-        let mut before: Option<Node> = None;
+        let mut after: Option<Node> = None;
 
         let mut iter = self.nodes.iter_spine().peekable();
         while let Some((_, current)) = iter.next() {
-            let after = iter.peek().map(|(_, node)| *node).cloned();
+            let before = iter.peek().map(|(_, node)| *node).cloned();
 
-            match self.layout {
-                LayoutDirection::Vertical => match current {
-                    Node::Container(c) => {
-                        let mut c = c.get_mut();
-                        c.edges.right.clone_from(&self.edges.right);
-                        c.edges.left.clone_from(&self.edges.right);
-                        c.edges.up = before;
-                        c.edges.down = after;
-                    }
-                    Node::Window(w) => {
-                        let mut edges = w.edges_mut();
-                        edges.right.clone_from(&self.edges.right);
-                        edges.left.clone_from(&self.edges.right);
-                        edges.up = before;
-                        edges.down = after;
-                    }
-                },
-                LayoutDirection::Horizontal => match current {
-                    Node::Container(c) => {
-                        let mut c = c.get_mut();
-                        c.edges.left = before;
-                        c.edges.right = after;
-                        c.edges.up.clone_from(&self.edges.up);
-                        c.edges.down.clone_from(&self.edges.down);
-                    }
-                    Node::Window(w) => {
-                        let mut edges = w.edges_mut();
-                        edges.left = before;
-                        edges.right = after;
-                        edges.up.clone_from(&self.edges.up);
-                        edges.down.clone_from(&self.edges.down);
-                    }
-                },
+            match current {
+                Node::Container(c) => {
+                    let mut c = c.get_mut();
+                    c.edges.before = before;
+                    c.edges.after = after;
+                }
+                Node::Window(w) => {
+                    let mut edges = w.edges_mut();
+                    edges.before = before;
+                    edges.after = after;
+                }
+            };
+
+            after = Some(current.clone());
+        }
+    }
+
+    pub fn resize(&mut self, default_ratio: f32, amount: u32, kind: ResizeType) {
+        let ratio = self.ratio.unwrap_or(default_ratio);
+        let step = match kind {
+            ResizeType::Shrink => -(amount as f32 / 100.0),
+            ResizeType::Grow => amount as f32 / 100.0,
+        };
+
+        let (before, after) = self.edges.split();
+        match (before, after) {
+            (Some(before), Some(after)) => {
+                let before_ratio = before.ratio();
+                let updated_before_ratio = before_ratio.unwrap_or(default_ratio) - step / 2.0;
+                before.set_ratio(updated_before_ratio);
+
+                let after_ratio = after.ratio();
+                let updated_after_ratio = after_ratio.unwrap_or(default_ratio) - step / 2.0;
+                after.set_ratio(updated_after_ratio);
+
+                let updated_ratio = ratio + step;
+                self.ratio = Some(updated_ratio);
             }
-
-            before = Some(current.clone());
+            (Some(edge), _) | (_, Some(edge)) => {
+                let edge_ratio = edge.ratio();
+                let updated_ratio = ratio + step;
+                let updated_edge_ratio = edge_ratio.unwrap_or(default_ratio) - step;
+                self.ratio = Some(updated_ratio);
+                edge.set_ratio(updated_edge_ratio);
+            }
+            _ => {}
         }
     }
 }

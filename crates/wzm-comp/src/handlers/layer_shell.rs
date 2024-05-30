@@ -75,9 +75,11 @@ impl Wzm {
 
                 let scale = output.current_scale().integer_scale();
                 let transform = output.current_transform();
+
                 with_states(surface, |data| {
                     send_surface_state(surface, data, scale, transform)
                 });
+
                 layer.layer_surface().send_configure();
             }
 

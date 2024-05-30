@@ -1,4 +1,3 @@
-use crate::Wzm;
 use smithay::desktop::Window;
 use smithay::input::pointer::{
     AxisFrame, ButtonEvent, GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent,
@@ -8,7 +7,8 @@ use smithay::input::pointer::{
 };
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
-use tracing::debug;
+
+use crate::Wzm;
 
 pub struct MoveSurfaceGrab {
     pub start_data: PointerGrabStartData<Wzm>,
@@ -29,14 +29,14 @@ impl PointerGrab<Wzm> for MoveSurfaceGrab {
 
         let delta = event.location - self.start_data.location;
         let new_location = self.initial_window_location.to_f64() + delta;
-        let ws = data.get_current_workspace();
-        let ws = ws.get_mut();
-        let (_, w) = ws.get_focus();
-        let wrap = w.unwrap();
-        wrap.update_loc(new_location.to_i32_round());
-        debug!("moving window to {new_location:?}");
+        let tree = data.get_current_workspace();
+        // let ws = tree.get_mut();
+        // let (_, w) = ws.get_focus();
+        // let wrap = w.unwrap();
+        // wrap.update_loc(new_location.to_i32_round());
+        // debug!("moving window to {new_location:?}");
 
-        wrap.map(&mut data.space, true);
+        // wrap.map(&mut data.space, true);
     }
 
     fn relative_motion(

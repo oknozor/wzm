@@ -25,6 +25,18 @@ pub enum Mode {
     Resize,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ResizeType {
+    Shrink,
+    Grow,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub enum ResizeDirection {
+    Height,
+    Width,
+}
+
 impl KeyBinding {
     pub fn match_action(
         &self,
@@ -94,12 +106,10 @@ pub enum Action {
     MoveToWorkspace(u8),
     LayoutVertical,
     LayoutHorizontal,
+    ToggleSwitchLayout,
     ToggleFloating,
     ToggleResize,
-    ResizeLeft,
-    ResizeRight,
-    ResizeUp,
-    ResizeDown,
+    Resize(ResizeDirection, ResizeType, u32),
     Run {
         env: Vec<(String, String)>,
         command: String,
@@ -133,10 +143,8 @@ impl From<Action> for KeyAction {
             Action::ToggleFullScreenWindow => KeyAction::ToggleFullScreenWindow,
             Action::ToggleFullScreenContainer => KeyAction::ToggleFullScreenContainer,
             Action::ToggleResize => KeyAction::ToggleResize,
-            Action::ResizeLeft => KeyAction::ResizeLeft,
-            Action::ResizeRight => KeyAction::ResizeRight,
-            Action::ResizeUp => KeyAction::ResizeUp,
-            Action::ResizeDown => KeyAction::ResizeDown,
+            Action::Resize(kind, direction, ammount) => KeyAction::Resize(direction, kind, ammount),
+            Action::ToggleSwitchLayout => KeyAction::ToggleSwitchLayout,
         }
     }
 }

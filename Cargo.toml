@@ -8,9 +8,9 @@ wzm-comp = { path = "crates/wzm-comp" }
 
 [workspace.dependencies.smithay]
 default-features = false
-git = "https://github.com/stratawm/smithay"
+git = "https://github.com/Smithay/smithay"
 version = "0.3.0"
-rev = "fb44b24"
+rev = "0afc33267ed17e516ec8db118fbb137c8add9c09"
 features = [
     "desktop",
     "wayland_frontend",

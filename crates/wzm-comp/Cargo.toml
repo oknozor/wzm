@@ -15,3 +15,4 @@ cgmath = "0.18.0"
 
 [dev-dependencies]
 archunit_rs = { git = "https://github.com/oknozor/archunit_rs" }
+sealed_test = "1.0.0"

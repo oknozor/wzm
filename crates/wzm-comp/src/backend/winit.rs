@@ -27,7 +27,7 @@ impl Winit {
         display_handle: DisplayHandle,
     ) -> Result<Self, winit::Error> {
         let builder = WindowBuilder::new()
-            .with_inner_size(LogicalSize::new(800.0, 600.0))
+            .with_inner_size(LogicalSize::new(1920.0, 1080.0))
             .with_resizable(false)
             .with_title("wzm");
 
@@ -85,9 +85,6 @@ impl Winit {
         let damage = Rectangle::from_loc_and_size((0, 0), size);
 
         self.backend.bind().unwrap();
-        let render_elements = wzm
-            .get_current_workspace()
-            .render_borders(self.backend.renderer());
 
         smithay::desktop::space::render_output::<_, CustomRenderElements<GlesRenderer>, _, _>(
             &self.output,
@@ -95,7 +92,7 @@ impl Winit {
             1.0,
             0,
             [&wzm.space],
-            &render_elements,
+            &[],
             &mut self.damage_tracker,
             [0.1, 0.1, 0.1, 1.0],
         )

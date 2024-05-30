@@ -25,23 +25,18 @@ impl XdgShellHandler for Wzm {
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
         let workspace = self.get_current_workspace();
-        let mut workspace = workspace.get_mut();
+        let mut workspace = workspace.borrow_mut();
+        let window = Window::new_wayland_window(surface.clone());
 
-        let container = if let Some(layout) = self.next_layout {
-            self.next_layout = None;
-            workspace.create_container(layout)
-        } else {
-            workspace.get_focus().0
-        };
+        let next_layout = self.next_layout;
 
-        {
-            let mut container = container.get_mut();
-            container.push_toplevel(surface.clone());
-            container.update_layout();
-            container.update_inner_edges();
+        match next_layout {
+            Some(next_layout) => workspace.split_insert(window, next_layout),
+            None => workspace.insert(window),
         }
 
-        // Grab keyboard focus
+        self.next_layout = None;
+
         let handle = self
             .seat
             .get_keyboard()
@@ -49,7 +44,6 @@ impl XdgShellHandler for Wzm {
 
         let serial = SERIAL_COUNTER.next_serial();
         handle.set_focus(self, Some(surface.wl_surface().clone()), serial);
-        workspace.needs_redraw = true;
     }
 
     fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {
@@ -153,10 +147,6 @@ pub fn handle_commit(popups: &mut PopupManager, space: &Space<Window>, surface: 
         .find(|w| w.toplevel().unwrap().wl_surface() == surface)
         .cloned()
     {
-        // if let Some(_data) = window.user_data().get::<WindowState>() {
-        //
-        // }
-
         let initial_configure_sent = with_states(surface, |states| {
             states
                 .data_map

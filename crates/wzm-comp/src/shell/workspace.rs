@@ -116,7 +116,7 @@ pub struct Workspace {
     pub output: Output,
     pub fullscreen_layer: Option<Node>,
     root: ContainerRef,
-    focus: ContainerRef,
+    pub(crate) focus: ContainerRef,
     pub needs_redraw: bool,
     pub gaps: i32,
 }
@@ -132,6 +132,7 @@ impl Workspace {
             nodes: NodeMap::default(),
             layout: LayoutDirection::Horizontal,
             gaps,
+            ratio: None,
             edges: NodeEdge::default(),
         };
 
@@ -194,19 +195,6 @@ impl Workspace {
         (self.focus.clone(), window)
     }
 
-    pub fn create_container(&mut self, layout: LayoutDirection) -> ContainerRef {
-        let child = {
-            let (container, _) = self.get_focus();
-            let parent = container.clone();
-            let mut current = container.get_mut();
-            let child = current.create_child(layout, parent, self.gaps);
-            current.update_layout();
-            child
-        };
-
-        self.focus = child.clone();
-        child
-    }
 
     pub fn pop_container(&mut self) {
         let current = self.get_focus();

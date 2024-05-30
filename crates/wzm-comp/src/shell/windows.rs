@@ -1,4 +1,4 @@
-use std::cell::{RefCell, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::fmt::Debug;
 use std::sync::Mutex;
 
@@ -9,8 +9,10 @@ use smithay::utils::{Logical, Point, Rectangle, Size};
 use smithay::wayland::compositor;
 use smithay::wayland::shell::xdg::{ToplevelSurface, XdgToplevelSurfaceRoleAttributes};
 
+use wzm_config::keybinding::ResizeType;
+
+use crate::shell::{FLOATING_Z_INDEX, node, TILING_Z_INDEX};
 use crate::shell::node::NodeEdge;
-use crate::shell::{node, FLOATING_Z_INDEX, TILING_Z_INDEX};
 
 #[derive(Debug, Clone)]
 pub struct WindowState {
@@ -18,7 +20,7 @@ pub struct WindowState {
     floating: RefCell<bool>,
     configured: RefCell<bool>,
     initial_size: RefCell<Size<i32, Logical>>,
-    _ratio: RefCell<f32>,
+    ratio: RefCell<Option<f32>>,
     size: RefCell<Size<i32, Logical>>,
     loc: RefCell<Point<i32, Logical>>,
     edges: RefCell<NodeEdge>,
@@ -31,7 +33,7 @@ impl WindowState {
             floating: RefCell::new(false),
             configured: RefCell::new(false),
             initial_size: RefCell::new(Default::default()),
-            _ratio: RefCell::new(1.0),
+            ratio: RefCell::new(None),
             size: RefCell::new(Default::default()),
             loc: RefCell::new(Default::default()),
             edges: RefCell::new(Default::default()),
@@ -46,8 +48,12 @@ impl WindowState {
         *self.loc.borrow()
     }
 
-    pub fn edges(&self) -> RefMut<'_, NodeEdge> {
+    pub fn edges_mut(&self) -> RefMut<'_, NodeEdge> {
         self.edges.borrow_mut()
+    }
+
+    pub fn edges(&self) -> Ref<'_, NodeEdge> {
+        self.edges.borrow()
     }
 
     pub fn is_floating(&self) -> bool {
@@ -64,6 +70,14 @@ impl WindowState {
 
     pub fn initial_size(&self) -> Size<i32, Logical> {
         *self.initial_size.borrow()
+    }
+
+    pub fn set_ratio(&self, ratio: f32) {
+        self.ratio.replace(Some(ratio));
+    }
+
+    pub fn reset_ratio(&self) {
+        self.ratio.replace(None);
     }
 
     pub fn set_initial_geometry(&self, size: Size<i32, Logical>) {
@@ -104,6 +118,41 @@ impl WzmWindow {
     pub fn set_fullscreen(&self, zone: Rectangle<i32, Logical>) {
         self.update_loc_and_size(Some(zone.size), zone.loc);
     }
+
+    pub fn resize(&self, default_ratio: f32, amount: u32, kind: ResizeType) {
+        let ratio = self.ratio().unwrap_or(default_ratio);
+        let step = match kind {
+            ResizeType::Shrink => -(amount as f32 / 100.0),
+            ResizeType::Grow => amount as f32 / 100.0,
+        };
+
+        let mut edges = self.edges_mut();
+        let (before, after) = edges.split();
+
+        match (before, after) {
+            (Some(before), Some(after)) => {
+                let before_ratio = before.ratio();
+                let updated_before_ratio = before_ratio.unwrap_or(default_ratio) - step / 2.0;
+                before.set_ratio(updated_before_ratio);
+
+                let after_ratio = after.ratio();
+                let updated_after_ratio = after_ratio.unwrap_or(default_ratio) - step / 2.0;
+                after.set_ratio(updated_after_ratio);
+
+                let updated_ratio = ratio + step;
+                self.get_state().set_ratio(updated_ratio);
+            }
+            (Some(edge), _) | (_, Some(edge)) => {
+                let edge_ratio = edge.ratio();
+                let updated_ratio = ratio + step;
+                let updated_edge_ratio = edge_ratio.unwrap_or(default_ratio) - step;
+                self.get_state().set_ratio(updated_ratio);
+                edge.set_ratio(updated_edge_ratio);
+            }
+            _ => {}
+        }
+    }
+
 
     pub fn xdg_surface_attributes(&self) -> XdgTopLevelAttributes {
         compositor::with_states(self.wl_surface().unwrap(), |states| {
@@ -173,8 +222,8 @@ impl WzmWindow {
     }
 
     pub fn update_loc<P>(&self, location: P) -> bool
-    where
-        P: Into<Point<i32, Logical>> + Debug,
+        where
+            P: Into<Point<i32, Logical>> + Debug,
     {
         let state = self.get_state();
         let new_location = location.into();
@@ -187,9 +236,9 @@ impl WzmWindow {
     }
 
     pub fn update_loc_and_size<S, P>(&self, size: Option<S>, location: P) -> bool
-    where
-        S: Into<Size<i32, Logical>> + Debug,
-        P: Into<Point<i32, Logical>> + Debug,
+        where
+            S: Into<Size<i32, Logical>> + Debug,
+            P: Into<Point<i32, Logical>> + Debug,
     {
         let state = self.get_state();
         let new_location = location.into();
@@ -229,6 +278,10 @@ impl WzmWindow {
     }
 
     pub fn edges_mut(&self) -> RefMut<'_, NodeEdge> {
+        self.get_state().edges_mut()
+    }
+
+    pub fn edges(&self) -> Ref<'_, NodeEdge> {
         self.get_state().edges()
     }
 
@@ -253,6 +306,10 @@ impl WzmWindow {
 
     pub fn size(&self) -> Size<i32, Logical> {
         *self.get_state().size.borrow()
+    }
+
+    pub fn ratio(&self) -> Option<f32> {
+        *self.get_state().ratio.borrow()
     }
 
     pub fn loc(&self) -> Point<i32, Logical> {

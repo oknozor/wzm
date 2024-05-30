@@ -1,5 +1,7 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::OsString;
+use std::rc::Rc;
 use std::sync::Arc;
 
 use smithay::desktop::{PopupManager, Space, Window, WindowSurfaceType};
@@ -24,8 +26,7 @@ use smithay::wayland::xdg_foreign::XdgForeignState;
 
 use wzm_config::{keybinding, WzmConfig};
 
-use crate::shell::container::LayoutDirection;
-use crate::shell::workspace::WorkspaceRef;
+use crate::shell2::{Orientation, Tree};
 use crate::CalloopData;
 
 pub struct Wzm {
@@ -52,9 +53,9 @@ pub struct Wzm {
     // Shell
     pub mod_pressed: bool,
     pub current_mode: keybinding::Mode,
-    pub workspaces: HashMap<u8, WorkspaceRef>,
+    pub workspaces: HashMap<u8, Rc<RefCell<Tree<Window>>>>,
     pub current_workspace: u8,
-    pub next_layout: Option<LayoutDirection>,
+    pub next_layout: Option<Orientation>,
 }
 
 impl Wzm {
@@ -183,6 +184,11 @@ impl Wzm {
 
     pub fn resize_mode(&self) -> bool {
         matches!(self.current_mode, keybinding::Mode::Resize)
+    }
+
+    pub fn get_current_workspace(&self) -> Rc<RefCell<Tree<Window>>> {
+        let idx = self.current_workspace;
+        self.workspaces.get(&idx).unwrap().clone()
     }
 }
 

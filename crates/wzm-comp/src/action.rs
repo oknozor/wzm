@@ -1,81 +1,47 @@
+use nix::libc;
+use std::borrow::Cow;
+use std::cell::RefMut;
+use std::io;
+use std::os::unix::prelude::CommandExt;
+use std::process::{Command, Stdio};
+
 use smithay::desktop::Window;
-use smithay::input::pointer::Focus;
 use smithay::utils::{Point, Serial, SERIAL_COUNTER};
-use tracing::debug;
+use smithay::wayland::seat::WaylandFocus;
+use tracing::{debug, warn};
 
-use crate::grabs::MoveSurfaceGrab;
 use wzm_config::action::Direction;
-use wzm_config::keybinding::Mode;
+use wzm_config::keybinding::{Mode, ResizeDirection, ResizeType};
 
-use crate::shell::container::{ContainerState, LayoutDirection};
-use crate::shell::node::Node;
-use crate::shell::windows::{WindowState, WzmWindow};
+use crate::shell2::{Orientation, Tree};
 use crate::Wzm;
 
 impl Wzm {
     pub fn set_layout_h(&mut self) {
-        self.next_layout = Some(LayoutDirection::Horizontal)
+        self.next_layout = Some(Orientation::Horizontal)
     }
 
     pub fn set_layout_v(&mut self) {
-        self.next_layout = Some(LayoutDirection::Vertical)
+        self.next_layout = Some(Orientation::Vertical)
     }
 
     pub fn toggle_floating(&mut self) {
-        let ws = self.get_current_workspace();
-        let mut ws = ws.get_mut();
-        let focus = ws.get_focus();
-
-        if let Some(window) = focus.1 {
-            window.toggle_floating();
-            ws.needs_redraw = true;
-        }
+        //
     }
 
     pub fn toggle_fullscreen_window(&mut self) {
-        let ws = self.get_current_workspace();
-        let mut ws = ws.get_mut();
-
-        if ws.fullscreen_layer.is_some() {
-            ws.fullscreen_layer = None;
-        } else {
-            let (_c, window) = ws.get_focus();
-            if let Some(window) = window {
-                ws.fullscreen_layer = Some(Node::Window(window));
-            }
-        }
-
-        ws.needs_redraw = true;
-    }
-
-    pub fn toggle_fullscreen_container(&mut self) {
-        let ws = self.get_current_workspace();
-        let mut ws = ws.get_mut();
-        if ws.fullscreen_layer.is_some() {
-            ws.reset_gaps();
-            ws.fullscreen_layer = None;
-        } else {
-            let (container, _) = ws.get_focus();
-            let zone = ws.non_exclusive_zone();
-            container.get_mut().set_fullscreen_loc_and_size(zone);
-            ws.fullscreen_layer = Some(Node::Container(container));
-        }
-
-        ws.needs_redraw = true
+        todo!()
     }
 
     pub fn move_focus(&mut self, direction: Direction) {
-        let window = self.scan_window(direction);
-
-        if let Some(window) = window {
-            let serial = SERIAL_COUNTER.next_serial();
-            let id = window.user_data().get::<WindowState>().unwrap().id();
-            let ws = self.get_current_workspace();
-            let mut ws = ws.get_mut();
-            let container = ws.root().container_having_window(id).unwrap();
-            let window = WzmWindow::from(window);
-            ws.set_container_and_window_focus(&container, &window);
-            self.toggle_window_focus(serial, window.inner());
+        let ws = self.get_current_workspace();
+        let mut ws = ws.borrow_mut();
+        if let Some(window) = self.scan_window(direction, &ws) {
+            if let Some(focus) = ws.get_node_for_data(&window) {
+                ws.set_focus(focus);
+                let serial = SERIAL_COUNTER.next_serial();
+                self.toggle_window_focus(serial, &window);
+            }
         }
     }
 
@@ -88,15 +54,11 @@ impl Wzm {
             }
         });
 
-        let window = WzmWindow::from(window.clone());
-        let location = self.space.element_bbox(window.inner()).unwrap().loc;
+        let location = self.space.element_bbox(&window).unwrap().loc;
 
-        self.space
-            .map_element(window.inner().clone(), location, true);
+        self.space.map_element(window.clone(), location, true);
 
-        keyboard.set_focus(self, window.wl_surface().cloned(), serial);
-
-        let window = window.inner();
+        keyboard.set_focus(self, window.wl_surface().map(Cow::into_owned), serial);
 
         window.set_activated(true);
 
@@ -105,20 +67,21 @@ impl Wzm {
         }
     }
 
-    fn scan_window(&mut self, direction: Direction) -> Option<Window> {
-        let ws = self.get_current_workspace();
-        let ws = ws.get();
-        let focus = ws.get_focus();
+    fn scan_window(
+        &mut self,
+        direction: Direction,
+        ws: &RefMut<'_, Tree<Window>>,
+    ) -> Option<Window> {
         let mut window = None;
-        if let Some(window_ref) = focus.1 {
+        if let Some(focus) = ws.get_focus() {
             let loc = self
                 .space
-                .element_location(window_ref.inner())
+                .element_location(&focus)
                 .expect("window should have a location");
 
             let (mut x, mut y) = (loc.x, loc.y);
-            let width = window_ref.inner().geometry().size.w;
-            let height = window_ref.inner().geometry().size.h;
+            let width = focus.geometry().size.w;
+            let height = focus.geometry().size.h;
 
             // Move one pixel inside the window to avoid being out of bbox after converting to f64
             match direction {
@@ -150,176 +113,65 @@ impl Wzm {
     }
 
     pub fn close(&mut self) {
-        let state = {
-            let container = self.get_current_workspace().get_mut().get_focus().0;
-            let mut container = container.get_mut();
-            debug!("Closing window in container: {}", container.id);
-            container.close_focused_window();
-            container.state()
+        let tree = self.get_current_workspace();
+        let mut tree = tree.borrow_mut();
+        if let Some(toplevel) = tree.get_focus().as_ref().and_then(|w| w.toplevel()) {
+            toplevel.send_close();
         };
 
-        match state {
-            ContainerState::Empty => {
-                debug!("Closing empty container");
-                let ws = self.get_current_workspace();
-                let mut ws = ws.get_mut();
-                ws.pop_container();
-                if let Some(window) = ws.get_focus().1 {
-                    self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
-                }
-            }
+        tree.remove();
 
-            ContainerState::HasContainersOnly => {
-                let ws = self.get_current_workspace();
-                let ws = ws.get();
-                let container = ws.get_focused_container();
-                let mut container = container.get_mut();
+        if let Some(window) = tree.get_focus() {
+            let handle = self
+                .seat
+                .get_keyboard()
+                .expect("Should have a keyboard seat");
 
-                let Some(Node::Container(first)) = container.nodes.remove_first() else {
-                    panic!("first child must be a container");
-                };
-
-                let mut first = first.get_mut();
-                let orphans = first.nodes.drain_all().into_iter().collect();
-                container.layout = first.layout;
-                container.nodes.extend(orphans);
-                container.update_layout();
-            }
-
-            ContainerState::HasWindows => {
-                let ws = self.get_current_workspace();
-                let ws = ws.get();
-                if let Some(window) = ws.get_focus().1 {
-                    self.toggle_window_focus(SERIAL_COUNTER.next_serial(), window.inner());
-                }
-
-                debug!("Cannot remove non empty container");
-            }
-        };
-
-        // Reset focus
-        let workspace = self.get_current_workspace();
-        let mut workspace = workspace.get_mut();
-
-        {
-            if let Some(window) = workspace.get_focus().1 {
-                let handle = self
-                    .seat
-                    .get_keyboard()
-                    .expect("Should have a keyboard seat");
-
-                let serial = SERIAL_COUNTER.next_serial();
-                handle.set_focus(self, window.wl_surface().cloned(), serial);
-                workspace.needs_redraw = true;
-            }
+            let serial = SERIAL_COUNTER.next_serial();
+            handle.set_focus(self, window.wl_surface().map(Cow::into_owned), serial);
         }
     }
 
     pub fn move_window(&mut self, direction: Direction) {
-        debug!("{direction:?}");
-
-        // TODO: this should be simplified !
-        let new_focus = {
-            let ws = self.get_current_workspace();
-            let ws = ws.get();
-            let (container, window) = ws.get_focus();
-
-            match window {
-                Some(window) => {
-                    let target = self
-                        .scan_window(direction)
-                        .map(|target| target.user_data().get::<WindowState>().unwrap().id())
-                        .and_then(|id| {
-                            ws.root()
-                                .container_having_window(id)
-                                .map(|container| (id, container))
-                        });
-
-                    if let Some((target_window_id, target_container)) = target {
-                        let target_container_id = target_container.get().id;
-                        let current_container_id = container.get().id;
-
-                        // Ensure we are not taking a double borrow if window moves in the same container
-                        if target_container_id == current_container_id {
-                            let mut container = container.get_mut();
-                            container.nodes.remove(&window.id());
-                            match direction {
-                                Direction::Left | Direction::Up => {
-                                    container.insert_window_before(target_window_id, window)
-                                }
-                                Direction::Right | Direction::Down => {
-                                    container.insert_window_after(target_window_id, window)
-                                }
-                            }
-                        } else {
-                            let container_state = {
-                                let mut target_container = target_container.get_mut();
-                                let mut current = container.get_mut();
-                                current.nodes.remove(&window.id());
-                                match direction {
-                                    Direction::Left | Direction::Up => target_container
-                                        .insert_window_after(target_window_id, window),
-                                    Direction::Right | Direction::Down => target_container
-                                        .insert_window_before(target_window_id, window),
-                                }
-
-                                current.state()
-                            };
-
-                            if container_state == ContainerState::Empty {
-                                let container = container.get();
-                                if let Some(parent) = &container.parent {
-                                    let mut parent = parent.get_mut();
-                                    parent.nodes.remove(&container.id);
-                                }
-                            }
-                        }
-
-                        Some(target_container)
-                    } else {
-                        None
-                    }
-                }
-                None => None,
+        let tree = self.get_current_workspace();
+        let mut tree = tree.borrow_mut();
+        if let Some(window) = self.scan_window(direction, &tree) {
+            if let Some((tree_id, leaf_id)) = tree.get_node_for_data(&window) {
+                tree.move_node(tree_id, leaf_id);
             }
-        };
-
-        if let Some(new_focus) = new_focus {
-            let ws = self.get_current_workspace();
-            let mut ws = ws.get_mut();
-            ws.set_container_focused(&new_focus);
         }
     }
 
     pub fn move_request_server(&mut self, serial: Serial, button_used: u32) {
-        debug!("Initiating move request from server");
+        /*        debug!("Initiating move request from server");
 
-        let pointer = self.seat.get_pointer().expect("seat had no pointer");
-        let point = pointer.current_location();
-        let Some((window, window_loc)) = self.space.element_under(point) else {
-            debug!("no window below cursor");
-            return;
-        };
+                let pointer = self.seat.get_pointer().expect("seat had no pointer");
+                let point = pointer.current_location();
+                let Some((window, window_loc)) = self.space.element_under(point) else {
+                    debug!("no window below cursor");
+                    return;
+                };
 
-        // Return early if this is not a toplevel window
-        if window.user_data().get::<WindowState>().is_none() {
-            debug!("not a toplevel window");
-            return;
-        }
+                // Return early if this is not a toplevel window
+                if window.user_data().get::<WindowState>().is_none() {
+                    debug!("not a toplevel window");
+                    return;
+                }
 
-        let start_data = smithay::input::pointer::GrabStartData {
-            focus: pointer.current_focus().map(|focus| (focus, window_loc)),
-            button: button_used,
-            location: pointer.current_location(),
-        };
+                let start_data = smithay::input::pointer::GrabStartData {
+                    focus: pointer.current_focus().map(|focus| (focus, window_loc)),
+                    button: button_used,
+                    location: pointer.current_location(),
+                };
 
-        let grab = MoveSurfaceGrab {
-            start_data,
-            window: window.clone(),
-            initial_window_location: window_loc,
-        };
+                let grab = MoveSurfaceGrab {
+                    start_data,
+                    window: window.clone(),
+                    initial_window_location: window_loc,
+                };
 
-        pointer.set_grab(self, grab, serial, Focus::Clear);
+                pointer.set_grab(self, grab, serial, Focus::Clear);
+        */
     }
 
     pub fn toggle_resize(&mut self) {
@@ -327,56 +179,61 @@ impl Wzm {
             Mode::Normal => Mode::Resize,
             Mode::Resize => Mode::Normal,
         };
-        println!("Resize mode {}", self.resize_mode());
     }
 
-    pub fn resize(&mut self, direction: Direction) {
-        const RESIZE_STEP: i32 = 10;
-
-        println!("Resize {:?}", direction);
-
+    pub fn toggle_layout(&mut self) {
         let ws = self.get_current_workspace();
-        let ws = ws.get_mut();
-        if let (_, Some(w)) = ws.get_focus() {
-            let mut size = w.size();
-            let mut loc = w.loc();
+        let mut ws = ws.borrow_mut();
+        ws.toggle_layout();
+    }
 
-            let edges = w.edges_mut();
 
-            match direction {
-                Direction::Left => {
-                    if let Some(_left) = &edges.left {
-                        size.w += RESIZE_STEP;
-                        loc.x -= RESIZE_STEP;
-                    } else {
-                        size.w -= RESIZE_STEP;
-                    }
-                }
-                Direction::Right => {
-                    if let Some(_right) = &edges.right {
-                        size.w += RESIZE_STEP;
-                    } else {
-                        size.w -= RESIZE_STEP;
-                    }
-                }
-                Direction::Up => {
-                    if let Some(_up) = &edges.up {
-                        size.h += RESIZE_STEP;
-                        loc.y -= RESIZE_STEP;
-                    } else {
-                        size.h -= RESIZE_STEP;
-                    }
-                }
-                Direction::Down => {
-                    if let Some(_down) = &edges.down {
-                        size.h += RESIZE_STEP;
-                    } else {
-                        size.h -= RESIZE_STEP;
-                    }
-                }
+    pub fn resize(&mut self, kind: ResizeType, direction: ResizeDirection, amount: u32) {
+        let ws = self.get_current_workspace();
+        let mut ws = ws.borrow_mut();
+        ws.resize(kind, direction, amount as i32);
+    }
+}
+
+/// Spawns the command to run independently of the compositor.
+pub fn spawn(cmd: String, env: Vec<(String, String)>) {
+    debug!("spawning command: {cmd}, {env:?}");
+
+    let mut process = Command::new(&cmd);
+    process
+        .envs(env)
+        .stdin(Stdio::null())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    unsafe {
+        // Double-fork to avoid having to waitpid the child.
+        process.pre_exec(move || {
+            match libc::fork() {
+                -1 => return Err(io::Error::last_os_error()),
+                0 => (),
+                _ => libc::_exit(0),
             }
 
-            w.update_loc_and_size(Some(size), loc);
+            Ok(())
+        });
+    }
+
+    let mut child = match process.spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            panic!("error spawning {cmd:?}: {err:?}");
+        }
+    };
+
+    match child.wait() {
+        Ok(status) => {
+            if !status.success() {
+                warn!("child did not exit successfully: {status:?}");
+            }
+        }
+        Err(err) => {
+            warn!("error waiting for child: {err:?}");
         }
     }
 }

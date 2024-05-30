@@ -33,9 +33,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     event_loop
         .run(None, &mut data, |state| {
             let ws = state.wzm.get_current_workspace();
-            let mut ws = ws.get_mut();
-            if ws.needs_redraw {
-                ws.redraw(&mut state.wzm.space);
+            let mut ws = ws.borrow_mut();
+            for (window, geometry, activate) in ws.get_pending_updates() {
+                if let Some(toplevel) = window.toplevel() {
+                    toplevel.with_pending_state(|state| {
+                        state.size = Some(geometry.size);
+                    });
+
+                    toplevel.send_configure();
+                }
+
+                state.wzm.space.map_element(window, geometry.loc, activate);
             }
         })
         .unwrap();

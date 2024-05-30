@@ -1,6 +1,7 @@
-use smithay::utils::IsAlive;
-use std::collections::hash_map::Iter;
+use std::collections::hash_map::{Iter, ValuesMut};
 use std::collections::HashMap;
+
+use smithay::utils::IsAlive;
 
 use crate::shell::container::ContainerRef;
 use crate::shell::node::Node;
@@ -203,6 +204,10 @@ impl NodeMap {
         self.items.iter()
     }
 
+    pub fn iter_mut(&mut self) -> ValuesMut<'_, u32, Node> {
+        self.items.values_mut()
+    }
+
     fn remove_from_spine(&mut self, id: &u32) -> Option<u32> {
         // Find the matching id in spine
         let spine_part = {
@@ -257,15 +262,26 @@ impl NodeMap {
             })
     }
 
+    pub fn node_after(&self, id: &u32) -> Option<Node> {
+        let spine_index = self.spine_index(id)?;
+        if spine_index == 0 {
+            None
+        } else {
+            self.spine.get(spine_index + 1)
+                .and_then(|id|self.items.get(id).cloned())
+        }
+    }
+
     pub fn node_before(&self, id: &u32) -> Option<Node> {
         let spine_index = self.spine_index(id)?;
         if spine_index == 0 {
             None
         } else {
-            let id = self.spine[spine_index - 1];
-            self.items.get(&id).cloned()
+            self.spine.get(spine_index - 1)
+                .and_then(|id|self.items.get(id).cloned())
         }
     }
+
 
     fn set_focus_index(&mut self, idx: usize) {
         debug_assert!(self.spine.get(idx).is_some());
