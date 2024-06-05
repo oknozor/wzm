@@ -3,10 +3,16 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use smithay::utils::{Logical, Rectangle};
-use node::{Leaf, TreeNode};
+
+use leaf::Leaf;
+use tree::TreeNode;
+
 use crate::shell2::node::{Node, NodeId};
 
 mod node;
+mod tree;
+mod leaf;
+
 mod siblings;
 mod resize;
 
@@ -67,6 +73,29 @@ pub mod id {
 }
 
 impl<T: Clone + Eq> Tree<T> {
+    pub(crate) fn new(geometry: Rectangle<i32, Logical>, orientation: Orientation) -> Self {
+        let mut nodes = BTreeMap::new();
+        let root_id = NodeId::Tree(id::next());
+
+        let root = Node::Tree(Rc::new(RefCell::new(TreeNode {
+            id: root_id,
+            parent: None,
+            children: vec![],
+            geometry,
+            ratio: None,
+            orientation,
+        })));
+
+        nodes.insert(root_id, root);
+
+        Tree {
+            nodes,
+            root: root_id,
+            focus: (root_id, None),
+            pending_update: vec![],
+        }
+    }
+
     pub(crate) fn toggle_layout(&mut self) {
         let (focused_node, _) = self.focus;
         let node = self.get_tree(&focused_node);
@@ -75,6 +104,7 @@ impl<T: Clone + Eq> Tree<T> {
         drop(node);
         self.update_geometries(&focused_node);
     }
+
     pub(crate) fn move_node(&mut self, target_node_id: NodeId, target_leaf_id: NodeId) {
         let (focused_node, Some(leaf_id)) = self.focus else {
             return;
@@ -161,29 +191,6 @@ impl<T: Clone + Eq> Tree<T> {
         let (_, leaf_id) = self.focus;
         let leaf = self.get_leaf(&leaf_id?);
         Some(leaf.borrow().data.clone())
-    }
-
-    pub(crate) fn new(geometry: Rectangle<i32, Logical>, orientation: Orientation) -> Self {
-        let mut nodes = BTreeMap::new();
-        let root_id = NodeId::Tree(id::next());
-
-        let root = Node::Tree(Rc::new(RefCell::new(TreeNode {
-            id: root_id,
-            parent: None,
-            children: vec![],
-            geometry,
-            ratio: None,
-            orientation,
-        })));
-
-        nodes.insert(root_id, root);
-
-        Tree {
-            nodes,
-            root: root_id,
-            focus: (root_id, None),
-            pending_update: vec![],
-        }
     }
 
     /// Insert a new leaf on the tree, after the focused node.
