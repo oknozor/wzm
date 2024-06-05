@@ -1,25 +1,15 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::shell::leaf::Leaf;
 use smithay::utils::{Logical, Rectangle};
-use crate::shell2::leaf::Leaf;
 
-use crate::shell2::Orientation;
-use crate::shell2::tree::TreeNode;
+use crate::shell::tree::TreeNode;
 
 #[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone, Debug)]
 pub enum NodeId {
     Leaf(u32),
     Tree(u32),
-}
-
-impl NodeId {
-    pub fn value(&self) -> u32 {
-       match self {
-           NodeId::Leaf(id) => *id,
-           NodeId::Tree(id) => *id
-       }
-    }
 }
 
 pub enum Node<T> {
@@ -28,13 +18,6 @@ pub enum Node<T> {
 }
 
 impl<T> Node<T> {
-    pub fn id(&self) -> NodeId {
-        match self {
-            Node::Leaf(l) => l.borrow().id,
-            Node::Tree(t) => t.borrow().id
-        }
-    }
-
     pub fn set_geometry(&self, geometry: Rectangle<i32, Logical>) {
         match self {
             Node::Leaf(leaf) => {
@@ -47,33 +30,6 @@ impl<T> Node<T> {
             }
         }
     }
-
-    pub fn set_edge(&self, size: i32, orientation: Orientation) {
-        match self {
-            Node::Leaf(leaf) => {
-                let mut leaf = leaf.borrow_mut();
-                match orientation {
-                    Orientation::Vertical => leaf.geometry.size.h = size,
-                    Orientation::Horizontal => leaf.geometry.size.w = size,
-                }
-            }
-            Node::Tree(tree) => {
-                let mut tree = tree.borrow_mut();
-                match orientation {
-                    Orientation::Vertical => tree.geometry.size.h = size,
-                    Orientation::Horizontal => tree.geometry.size.w = size,
-                }
-            }
-        }
-    }
-
-    pub fn edge(&self, orientation: Orientation) -> i32 {
-        match orientation {
-            Orientation::Vertical => self.geometry().size.h,
-            Orientation::Horizontal => self.geometry().size.w
-        }
-    }
-
 
     pub fn geometry(&self) -> Rectangle<i32, Logical> {
         match self {

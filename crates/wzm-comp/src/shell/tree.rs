@@ -1,7 +1,7 @@
 use smithay::utils::{Logical, Rectangle};
 
-use crate::shell2::node::NodeId;
-use crate::shell2::Orientation;
+use crate::shell::node::NodeId;
+use crate::shell::Orientation;
 
 pub struct TreeNode {
     pub id: NodeId,

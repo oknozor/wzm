@@ -11,7 +11,7 @@ pub use state::Wzm;
 use wzm_config::WzmConfig;
 
 use crate::backend::Backend;
-use crate::shell2::{Orientation, Tree};
+use crate::shell::{Orientation, Tree};
 
 pub mod action;
 pub mod backend;
@@ -20,7 +20,7 @@ pub mod grabs;
 pub mod handlers;
 pub mod input;
 pub mod renderer;
-pub mod shell2;
+pub mod shell;
 pub mod state;
 pub struct CalloopData {
     pub wzm: Wzm,

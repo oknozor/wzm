@@ -26,7 +26,7 @@ use smithay::wayland::xdg_foreign::XdgForeignState;
 
 use wzm_config::{keybinding, WzmConfig};
 
-use crate::shell2::{Orientation, Tree};
+use crate::shell::{Orientation, Tree};
 use crate::CalloopData;
 
 pub struct Wzm {

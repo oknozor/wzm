@@ -7,14 +7,14 @@ use smithay::utils::{Logical, Rectangle};
 use leaf::Leaf;
 use tree::TreeNode;
 
-use crate::shell2::node::{Node, NodeId};
+use crate::shell::node::{Node, NodeId};
 
+mod leaf;
 mod node;
 mod tree;
-mod leaf;
 
-mod siblings;
 mod resize;
+mod siblings;
 
 pub struct Tree<T> {
     nodes: BTreeMap<NodeId, Node<T>>,
@@ -32,7 +32,6 @@ pub enum Resize {
     Grow,
     Shrink,
 }
-
 
 impl Direction {
     pub(super) fn invert(&self) -> Direction {
@@ -53,7 +52,7 @@ impl Orientation {
     fn invert(&self) -> Self {
         match self {
             Orientation::Vertical => Orientation::Horizontal,
-            Orientation::Horizontal => Orientation::Vertical
+            Orientation::Horizontal => Orientation::Vertical,
         }
     }
 }
@@ -140,8 +139,7 @@ impl<T: Clone + Eq> Tree<T> {
         let focus = self.focus.1;
 
         ids.iter()
-            .map(|id| self.nodes.get(id))
-            .flatten()
+            .filter_map(|id| self.nodes.get(id))
             .filter(|n| n.is_leaf())
             .filter_map(|n| match n {
                 Node::Leaf(l) => {
@@ -196,7 +194,8 @@ impl<T: Clone + Eq> Tree<T> {
     /// Insert a new leaf on the tree, after the focused node.
     /// If the focused leaf is not found, append to the tree.
     pub(crate) fn insert(&mut self, data: T) {
-        #[cfg(not(test))] debug_assert!(self.pending_update.is_empty());
+        #[cfg(not(test))]
+        debug_assert!(self.pending_update.is_empty());
 
         let (tree_id, leaf_id) = self.focus;
         let new_leaf_id = NodeId::Leaf(id::next());
@@ -237,7 +236,8 @@ impl<T: Clone + Eq> Tree<T> {
     /// Create a subtree with the given orientation, reposition the
     /// focused leaf in the new tree and append the new leaf
     pub(crate) fn split_insert(&mut self, data: T, orientation: Orientation) {
-        #[cfg(not(test))]  debug_assert!(self.pending_update.is_empty());
+        #[cfg(not(test))]
+        debug_assert!(self.pending_update.is_empty());
         let (tree_id, leaf_id) = self.focus;
 
         // Empty root, we just need to change the orientation of root
@@ -290,7 +290,6 @@ impl<T: Clone + Eq> Tree<T> {
 
         tree.children.remove(leaf_idx);
 
-
         self.nodes
             .insert(new_node_id, Node::Tree(Rc::new(RefCell::new(new_node))));
         self.nodes
@@ -304,13 +303,10 @@ impl<T: Clone + Eq> Tree<T> {
 
     /// Remove the focused leaf from the tree, otherwise panic
     pub(crate) fn remove(&mut self) -> Option<Node<T>> {
-        #[cfg(not(test))]  debug_assert!(self.pending_update.is_empty());
+        #[cfg(not(test))]
+        debug_assert!(self.pending_update.is_empty());
         let (tree_id, leaf_id) = self.focus;
-
-        // If there is no leaf focus there is nothing to remove (empty root)
-        let Some(leaf_id) = leaf_id else {
-            return None;
-        };
+        let leaf_id = leaf_id?;
 
         let mut next_focus = self.neighbour(&leaf_id, Direction::Before);
 
@@ -371,7 +367,6 @@ impl<T: Clone + Eq> Tree<T> {
         removed
     }
 
-
     // Walk up the tree from the given id until a leaf is find before or after this node
     // Returns both the found leaf and its parent node
     //                      0    <-    3. nothing was found on the previous step, repeat starting from node(2)
@@ -382,7 +377,7 @@ impl<T: Clone + Eq> Tree<T> {
     fn neighbour(&self, id: &NodeId, direction: Direction) -> (NodeId, Option<NodeId>) {
         let parent = self
             .nodes
-            .get(&id)
+            .get(id)
             .and_then(|node| node.parent_id())
             .map(|id| self.get_tree(&id));
 
@@ -425,7 +420,7 @@ impl<T: Clone + Eq> Tree<T> {
         match neighbour {
             Some(NodeId::Leaf(_)) => (*parent_id, neighbour.copied()),
             _ => self
-                .descendant_leaf(&parent_id, direction.invert())
+                .descendant_leaf(parent_id, direction.invert())
                 .map(|id| (self.get_leaf(&id).borrow().parent.unwrap(), Some(id)))
                 .unwrap_or((
                     self.root,
@@ -455,7 +450,9 @@ impl<T: Clone + Eq> Tree<T> {
             };
         }
 
-        let default_ratio = if default_ratio_count == 0 { 0.0 } else {
+        let default_ratio = if default_ratio_count == 0 {
+            0.0
+        } else {
             (1.0 - total_non_default_ratio) / default_ratio_count as f32
         };
 
@@ -476,15 +473,13 @@ impl<T: Clone + Eq> Tree<T> {
 
             let geometry = Rectangle::from_loc_and_size(next_loc, (width, height));
 
-            next_loc = match *&tree.orientation {
-                Orientation::Vertical => {
-                    (geometry.loc.x, geometry.loc.y + geometry.size.h).into()
-                }
+            next_loc = match tree.orientation {
+                Orientation::Vertical => (geometry.loc.x, geometry.loc.y + geometry.size.h).into(),
                 Orientation::Horizontal => {
                     (geometry.loc.x + geometry.size.w, geometry.loc.y).into()
                 }
             };
-            node.set_geometry(geometry.clone());
+            node.set_geometry(geometry);
 
             if let Node::Tree(_) = node {
                 self.update_geometries(child);
@@ -542,8 +537,8 @@ mod test {
     use sealed_test::prelude::*;
     use smithay::utils::Rectangle;
 
-    use crate::shell2::{Direction, Orientation, Tree};
-    use crate::shell2::node::NodeId;
+    use crate::shell::node::NodeId;
+    use crate::shell::{Direction, Orientation, Tree};
 
     #[sealed_test]
     fn should_insert_in_root() {

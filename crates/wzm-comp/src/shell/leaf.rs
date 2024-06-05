@@ -1,5 +1,5 @@
+use crate::shell::node::NodeId;
 use smithay::utils::{Logical, Rectangle};
-use crate::shell2::node::NodeId;
 
 pub struct Leaf<T> {
     pub id: NodeId,

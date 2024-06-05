@@ -13,7 +13,7 @@ use tracing::{debug, warn};
 use wzm_config::action::Direction;
 use wzm_config::keybinding::{Mode, ResizeDirection, ResizeType};
 
-use crate::shell2::{Orientation, Tree};
+use crate::shell::{Orientation, Tree};
 use crate::Wzm;
 
 impl Wzm {
@@ -54,7 +54,7 @@ impl Wzm {
             }
         });
 
-        let location = self.space.element_bbox(&window).unwrap().loc;
+        let location = self.space.element_bbox(window).unwrap().loc;
 
         self.space.map_element(window.clone(), location, true);
 
@@ -186,7 +186,6 @@ impl Wzm {
         let mut ws = ws.borrow_mut();
         ws.toggle_layout();
     }
-
 
     pub fn resize(&mut self, kind: ResizeType, direction: ResizeDirection, amount: u32) {
         let ws = self.get_current_workspace();
