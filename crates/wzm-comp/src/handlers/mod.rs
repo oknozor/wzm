@@ -10,7 +10,7 @@ use smithay::wayland::selection::SelectionHandler;
 use smithay::wayland::xdg_foreign::{XdgForeignHandler, XdgForeignState};
 use smithay::{delegate_data_device, delegate_output, delegate_seat, delegate_xdg_foreign};
 
-use crate::Wzm;
+use crate::{Wzm, State};
 
 mod activation;
 mod compositor;
@@ -27,7 +27,7 @@ impl SeatHandler for Wzm {
     type TouchFocus = WlSurface;
 
     fn seat_state(&mut self) -> &mut SeatState<Wzm> {
-        &mut self.seat_state
+        &mut self.state.seat_state
     }
 
     fn cursor_image(
@@ -38,7 +38,7 @@ impl SeatHandler for Wzm {
     }
 
     fn focus_changed(&mut self, seat: &Seat<Self>, focused: Option<&WlSurface>) {
-        let dh = &self.display_handle;
+        let dh = &self.state.display_handle;
         let client = focused.and_then(|s| dh.get_client(s.id()).ok());
         set_data_device_focus(dh, seat, client);
     }
@@ -56,7 +56,7 @@ impl SelectionHandler for Wzm {
 
 impl DataDeviceHandler for Wzm {
     fn data_device_state(&self) -> &DataDeviceState {
-        &self.data_device_state
+        &self.state.data_device_state
     }
 }
 
@@ -69,7 +69,7 @@ delegate_output!(Wzm);
 
 impl XdgForeignHandler for Wzm {
     fn xdg_foreign_state(&mut self) -> &mut XdgForeignState {
-        &mut self.xdg_foreign_state
+        &mut self.state.xdg_foreign_state
     }
 }
 

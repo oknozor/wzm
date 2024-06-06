@@ -1,5 +1,5 @@
 use crate::backend::winit::Winit;
-use crate::Wzm;
+use crate::State;
 use smithay::backend::allocator::dmabuf::Dmabuf;
 use smithay::backend::renderer::gles::GlesRenderer;
 use smithay::backend::renderer::ImportEgl;
@@ -9,6 +9,7 @@ use smithay::utils::Transform;
 use tracing::warn;
 
 pub mod winit;
+pub mod udev;
 
 // Thank you niri
 #[derive(PartialEq, Eq)]
@@ -27,7 +28,7 @@ pub enum Backend {
 }
 
 impl Backend {
-    pub fn init(&mut self, wzm: &mut Wzm) {
+    pub fn init(&mut self, wzm: &mut State) {
         match self {
             Backend::Winit(winit) => {
                 let renderer = winit.renderer();
@@ -54,7 +55,7 @@ impl Backend {
         todo!()
     }
 
-    pub fn render(&mut self, wzm: &mut Wzm) {
+    pub fn render(&mut self, wzm: &mut State) {
         match self {
             Backend::Winit(winit) => winit.render(wzm),
             Backend::Udev(_) => todo!(),
@@ -81,7 +82,7 @@ impl Backend {
         todo!()
     }
 
-    pub fn on_output_config_changed(&mut self, _wzm: &mut Wzm) {
+    pub fn on_output_config_changed(&mut self, _wzm: &mut State) {
         todo!()
     }
 

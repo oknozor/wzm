@@ -14,15 +14,15 @@ use wzm_config::action::Direction;
 use wzm_config::keybinding::{Mode, ResizeDirection, ResizeType};
 
 use crate::shell::{Orientation, Tree};
-use crate::Wzm;
+use crate::{Wzm, State};
 
 impl Wzm {
     pub fn set_layout_h(&mut self) {
-        self.next_layout = Some(Orientation::Horizontal)
+        self.state.next_layout = Some(Orientation::Horizontal)
     }
 
     pub fn set_layout_v(&mut self) {
-        self.next_layout = Some(Orientation::Vertical)
+        self.state.next_layout = Some(Orientation::Vertical)
     }
 
     pub fn toggle_floating(&mut self) {
@@ -34,7 +34,7 @@ impl Wzm {
     }
 
     pub fn move_focus(&mut self, direction: Direction) {
-        let ws = self.get_current_workspace();
+        let ws = self.state.get_current_workspace();
         let mut ws = ws.borrow_mut();
         if let Some(window) = self.scan_window(direction, &ws) {
             if let Some(focus) = ws.get_node_for_data(&window) {
@@ -46,17 +46,17 @@ impl Wzm {
     }
 
     fn toggle_window_focus(&mut self, serial: Serial, window: &Window) {
-        let keyboard = self.seat.get_keyboard().unwrap();
+        let keyboard = self.state.seat.get_keyboard().unwrap();
 
-        self.space.elements().for_each(|window| {
+        self.state.space.elements().for_each(|window| {
             if let Some(toplevel) = window.toplevel() {
                 toplevel.send_configure();
             }
         });
 
-        let location = self.space.element_bbox(window).unwrap().loc;
+        let location = self.state.space.element_bbox(window).unwrap().loc;
 
-        self.space.map_element(window.clone(), location, true);
+        self.state.space.map_element(window.clone(), location, true);
 
         keyboard.set_focus(self, window.wl_surface().map(Cow::into_owned), serial);
 
@@ -74,7 +74,7 @@ impl Wzm {
     ) -> Option<Window> {
         let mut window = None;
         if let Some(focus) = ws.get_focus() {
-            let loc = self
+            let loc = self.state
                 .space
                 .element_location(&focus)
                 .expect("window should have a location");
@@ -96,14 +96,14 @@ impl Wzm {
 
             let mut point = Point::from((x, y)).to_f64();
             while window.is_none() {
-                if self.space.output_under(point).next().is_none() {
+                if self.state.space.output_under(point).next().is_none() {
                     break;
                 }
 
                 direction.advance_point(&mut point);
 
                 window = {
-                    self.space
+                    self.state.space
                         .element_under(point)
                         .map(|(window, _)| window.clone())
                 };
@@ -113,7 +113,7 @@ impl Wzm {
     }
 
     pub fn close(&mut self) {
-        let tree = self.get_current_workspace();
+        let tree = self.state.get_current_workspace();
         let mut tree = tree.borrow_mut();
         if let Some(toplevel) = tree.get_focus().as_ref().and_then(|w| w.toplevel()) {
             toplevel.send_close();
@@ -122,7 +122,7 @@ impl Wzm {
         tree.remove();
 
         if let Some(window) = tree.get_focus() {
-            let handle = self
+            let handle = self.state
                 .seat
                 .get_keyboard()
                 .expect("Should have a keyboard seat");
@@ -133,7 +133,7 @@ impl Wzm {
     }
 
     pub fn move_window(&mut self, direction: Direction) {
-        let tree = self.get_current_workspace();
+        let tree = self.state.get_current_workspace();
         let mut tree = tree.borrow_mut();
         if let Some(window) = self.scan_window(direction, &tree) {
             if let Some((tree_id, leaf_id)) = tree.get_node_for_data(&window) {
@@ -175,20 +175,20 @@ impl Wzm {
     }
 
     pub fn toggle_resize(&mut self) {
-        self.current_mode = match self.current_mode {
+        self.state.current_mode = match self.state.current_mode {
             Mode::Normal => Mode::Resize,
             Mode::Resize => Mode::Normal,
         };
     }
 
     pub fn toggle_layout(&mut self) {
-        let ws = self.get_current_workspace();
+        let ws = self.state.get_current_workspace();
         let mut ws = ws.borrow_mut();
         ws.toggle_layout();
     }
 
     pub fn resize(&mut self, kind: ResizeType, direction: ResizeDirection, amount: u32) {
-        let ws = self.get_current_workspace();
+        let ws = self.state.get_current_workspace();
         let mut ws = ws.borrow_mut();
         ws.resize(kind, direction, amount as i32);
     }

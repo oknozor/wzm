@@ -17,13 +17,14 @@ use wzm_config::keybinding;
 use wzm_config::keybinding::Action;
 
 use crate::action::spawn;
-use crate::state::Wzm;
+use crate::Wzm;
+use crate::state::State;
 
 impl Wzm {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
         match event {
             InputEvent::Keyboard { event } => match self.keyboard_key_to_action::<I>(event) {
-                KeyAction::Resize(kind, direction, amount) if self.resize_mode() => {
+                KeyAction::Resize(kind, direction, amount) if self.state.resize_mode() => {
                     self.resize(kind, direction, amount)
                 }
                 KeyAction::Run(cmd, env) => spawn(cmd, env),
@@ -54,12 +55,12 @@ impl Wzm {
             },
             InputEvent::PointerMotion { .. } => {}
             InputEvent::PointerMotionAbsolute { event, .. } => {
-                let output = self.space.outputs().next().unwrap();
-                let output_geo = self.space.output_geometry(output).unwrap();
+                let output = self.state.space.outputs().next().unwrap();
+                let output_geo = self.state.space.output_geometry(output).unwrap();
                 let pos = event.position_transformed(output_geo.size) + output_geo.loc.to_f64();
                 let serial = SERIAL_COUNTER.next_serial();
-                let pointer = self.seat.get_pointer().unwrap();
-                let under = self.surface_under(pos);
+                let pointer = self.state.seat.get_pointer().unwrap();
+                let under = self.state.surface_under(pos);
 
                 pointer.motion(
                     self,
@@ -108,7 +109,7 @@ impl Wzm {
                     }
                 }
 
-                let pointer = self.seat.get_pointer().unwrap();
+                let pointer = self.state.seat.get_pointer().unwrap();
                 pointer.axis(self, frame);
                 pointer.frame(self);
             }
@@ -121,8 +122,8 @@ impl Wzm {
         let state = evt.state();
         let serial = SERIAL_COUNTER.next_serial();
         let time = Event::time_msec(&evt);
-        let keyboard = self.seat.get_keyboard().unwrap();
-        let mode = self.current_mode;
+        let keyboard = self.state.seat.get_keyboard().unwrap();
+        let mode = self.state.current_mode;
 
         keyboard
             .input(
@@ -135,15 +136,15 @@ impl Wzm {
                     let keysym = key_handle.modified_sym();
                     match state {
                         KeyState::Released if modifiers.alt => {
-                            app_state.mod_pressed = false;
+                            app_state.state.mod_pressed = false;
                             FilterResult::Forward
                         }
                         KeyState::Pressed if modifiers.alt => {
-                            app_state.mod_pressed = true;
-                            Self::key_pressed_to_action(app_state, modifiers, keysym, mode)
+                            app_state.state.mod_pressed = true;
+                            Self::key_pressed_to_action(&mut app_state.state, modifiers, keysym, mode)
                         }
                         KeyState::Pressed => {
-                            Self::key_pressed_to_action(app_state, modifiers, keysym, mode)
+                            Self::key_pressed_to_action(&mut app_state.state, modifiers, keysym, mode)
                         }
                         _ => FilterResult::Forward,
                     }
@@ -153,7 +154,7 @@ impl Wzm {
     }
 
     fn key_pressed_to_action(
-        app_state: &mut Wzm,
+        app_state: &mut State,
         modifiers: &ModifiersState,
         keysym: Keysym,
         mode: keybinding::Mode,
@@ -181,42 +182,43 @@ impl Wzm {
         &mut self,
         event: &<I as InputBackend>::PointerButtonEvent,
     ) {
-        let pointer = self.seat.get_pointer().unwrap();
-        let keyboard = self.seat.get_keyboard().unwrap();
+        let pointer = self.state.seat.get_pointer().unwrap();
+        let keyboard = self.state.seat.get_keyboard().unwrap();
         let serial = SERIAL_COUNTER.next_serial();
         let button = event.button_code();
         let state = event.state();
 
         if let Some(MouseButton::Right) = event.button() {
-            if ButtonState::Pressed == state && !pointer.is_grabbed() && self.mod_pressed {
+            if ButtonState::Pressed == state && !pointer.is_grabbed() && self.state.mod_pressed {
                 self.move_request_server(serial, button)
             }
         } else if ButtonState::Pressed == state && !pointer.is_grabbed() {
             let maybe_under_pointer = self
+                .state
                 .space
                 .element_under(pointer.current_location())
                 .map(|(w, l)| (w.clone(), l));
 
             match maybe_under_pointer {
                 Some((window, _)) => {
-                    let workspace = self.get_current_workspace();
+                    let workspace = self.state.get_current_workspace();
                     let mut workspace = workspace.borrow_mut();
 
                     workspace.set_focus_matching(&window);
 
-                    self.space.raise_element(&window, true);
+                    self.state.space.raise_element(&window, true);
                     keyboard.set_focus(
                         self,
                         Some(window.toplevel().unwrap().wl_surface().clone()),
                         serial,
                     );
 
-                    self.space.elements().for_each(|window| {
+                    self.state.space.elements().for_each(|window| {
                         window.toplevel().unwrap().send_pending_configure();
                     });
                 }
                 None => {
-                    self.space.elements().for_each(|window| {
+                    self.state.space.elements().for_each(|window| {
                         window.set_activated(false);
                         window.toplevel().unwrap().send_pending_configure();
                     });

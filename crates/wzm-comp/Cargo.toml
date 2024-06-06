@@ -12,6 +12,7 @@ xkbcommon = "0.7.0"
 nix = { version = "0.28.0" }
 once_cell = "1.19.0"
 cgmath = "0.18.0"
+smithay-drm-extras.workspace = true
 
 [dev-dependencies]
 archunit_rs = { git = "https://github.com/oknozor/archunit_rs" }

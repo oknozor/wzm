@@ -6,6 +6,11 @@ resolver = "2"
 wzm-config = { path = "crates/wzm-config" }
 wzm-comp = { path = "crates/wzm-comp" }
 
+[workspace.dependencies.smithay-drm-extras]
+git = "https://github.com/Smithay/smithay"
+version = "0.1.0"
+rev = "0afc33267ed17e516ec8db118fbb137c8add9c09"
+
 [workspace.dependencies.smithay]
 default-features = false
 git = "https://github.com/Smithay/smithay"
@@ -21,5 +26,8 @@ features = [
     "use_system_lib",
     "renderer_glow",
     "renderer_multi",
-    "wayland-protocols"
+    "wayland-protocols",
+    "libseat",
+    "backend_session_libseat",
+    "backend_libinput",
 ]

@@ -2,7 +2,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use wzm_comp::backend::winit::Winit;
 use wzm_comp::backend::Backend;
-use wzm_comp::{CalloopData, Display, EventLoop, Wzm};
+use wzm_comp::{Wzm, Display, EventLoop, State};
 use wzm_config::WzmConfig;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -13,26 +13,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    let mut event_loop: EventLoop<CalloopData> = EventLoop::try_new()?;
+    let mut event_loop: EventLoop<Wzm> = EventLoop::try_new()?;
     let loop_signal = event_loop.get_signal();
     let event_loop_handle = event_loop.handle();
     let display: Display<Wzm> = Display::new()?;
     let winit = Winit::new(event_loop_handle.clone(), display.handle()).unwrap();
-    let state = Wzm::new(event_loop_handle, display, winit.output());
+    let state = State::new(event_loop_handle, display, winit.output());
 
-    let mut data = CalloopData {
-        wzm: state,
+    let mut data = Wzm {
+        state,
         config: WzmConfig::get().unwrap(),
         backend: Backend::Winit(winit),
         loop_signal,
     };
 
-    data.backend.init(&mut data.wzm);
+    data.backend.init(&mut data.state);
     data.start_compositor();
 
     event_loop
         .run(None, &mut data, |state| {
-            let ws = state.wzm.get_current_workspace();
+            let ws = state.state.get_current_workspace();
             let mut ws = ws.borrow_mut();
             for (window, geometry, activate) in ws.get_pending_updates() {
                 if let Some(toplevel) = window.toplevel() {
@@ -43,7 +43,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     toplevel.send_configure();
                 }
 
-                state.wzm.space.map_element(window, geometry.loc, activate);
+                state.state.space.map_element(window, geometry.loc, activate);
             }
         })
         .unwrap();

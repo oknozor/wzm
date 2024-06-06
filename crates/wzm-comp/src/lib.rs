@@ -7,7 +7,7 @@ pub use smithay::reexports::wayland_server::{Display, DisplayHandle};
 use std::cell::RefCell;
 use std::rc::Rc;
 
-pub use state::Wzm;
+pub use state::State;
 use wzm_config::WzmConfig;
 
 use crate::backend::Backend;
@@ -22,22 +22,22 @@ pub mod input;
 pub mod renderer;
 pub mod shell;
 pub mod state;
-pub struct CalloopData {
-    pub wzm: Wzm,
+pub struct Wzm {
+    pub state: State,
     pub config: WzmConfig,
     pub backend: Backend,
     pub loop_signal: LoopSignal,
 }
 
-impl CalloopData {
+impl Wzm {
     pub fn start_compositor(&mut self) {
-        ::std::env::set_var("WAYLAND_DISPLAY", &self.wzm.socket_name);
+        ::std::env::set_var("WAYLAND_DISPLAY", &self.state.socket_name);
 
-        if let Some(output) = self.wzm.space.outputs().next() {
+        if let Some(output) = self.state.space.outputs().next() {
             let map = layer_map_for_output(output);
             let geometry = map.non_exclusive_zone();
 
-            self.wzm.workspaces.insert(
+            self.state.workspaces.insert(
                 0,
                 Rc::new(RefCell::new(Tree::new(geometry, Orientation::Horizontal))),
             );
@@ -45,7 +45,7 @@ impl CalloopData {
             panic!("Failed to create Workspace 0 on default Output");
         }
 
-        dbg!(&self.wzm.socket_name);
+        dbg!(&self.state.socket_name);
     }
 }
 

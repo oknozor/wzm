@@ -27,9 +27,9 @@ use smithay::wayland::xdg_foreign::XdgForeignState;
 use wzm_config::{keybinding, WzmConfig};
 
 use crate::shell::{Orientation, Tree};
-use crate::CalloopData;
+use crate::Wzm;
 
-pub struct Wzm {
+pub struct State {
     pub start_time: std::time::Instant,
     pub socket_name: OsString,
     pub display_handle: DisplayHandle,
@@ -46,7 +46,7 @@ pub struct Wzm {
     pub xdg_activation_state: XdgActivationState,
     pub xdg_foreign_state: XdgForeignState,
     pub layer_shell_state: WlrLayerShellState,
-    pub seat: Seat<Self>,
+    pub seat: Seat<Wzm>,
     // We should use this in calloopdata, not wazm
     pub config: WzmConfig,
 
@@ -58,22 +58,22 @@ pub struct Wzm {
     pub next_layout: Option<Orientation>,
 }
 
-impl Wzm {
+impl State {
     pub fn new(
-        event_loop: LoopHandle<CalloopData>,
-        display: Display<Self>,
+        event_loop: LoopHandle<Wzm>,
+        display: Display<Wzm>,
         output: &Output,
     ) -> Self {
         let start_time = std::time::Instant::now();
 
         let dh = display.handle();
 
-        let compositor_state = CompositorState::new::<Self>(&dh);
-        let xdg_shell_state = XdgShellState::new::<Self>(&dh);
-        let shm_state = ShmState::new::<Self>(&dh, vec![]);
-        let output_manager_state = OutputManagerState::new_with_xdg_output::<Self>(&dh);
+        let compositor_state = CompositorState::new::<Wzm>(&dh);
+        let xdg_shell_state = XdgShellState::new::<Wzm>(&dh);
+        let shm_state = ShmState::new::<Wzm>(&dh, vec![]);
+        let output_manager_state = OutputManagerState::new_with_xdg_output::<Wzm>(&dh);
         let mut seat_state = SeatState::new();
-        let data_device_state = DataDeviceState::new::<Self>(&dh);
+        let data_device_state = DataDeviceState::new::<Wzm>(&dh);
         let popups = PopupManager::default();
         let xdg_decoration_state = XdgDecorationState::new::<Wzm>(&dh);
         let xdg_activation_state = XdgActivationState::new::<Wzm>(&dh);
@@ -84,7 +84,7 @@ impl Wzm {
 
         // A seat is a group of keyboards, pointer and touch devices.
         // A seat typically has a pointer and maintains a keyboard focus and a pointer focus.
-        let mut seat: Seat<Self> = seat_state.new_wl_seat(&dh, "winit");
+        let mut seat: Seat<Wzm> = seat_state.new_wl_seat(&dh, "winit");
 
         // Notify clients that we have a keyboard, for the sake of the example we assume that keyboard is always present.
         // You may want to track keyboard hot-plug in real compositor.
@@ -130,7 +130,7 @@ impl Wzm {
 
     fn init_wayland_listener(
         display: Display<Wzm>,
-        event_loop: LoopHandle<CalloopData>,
+        event_loop: LoopHandle<Wzm>,
     ) -> OsString {
         // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
         let listening_socket = ListeningSocketSource::new_auto().unwrap();
@@ -145,7 +145,7 @@ impl Wzm {
                 //
                 // You may also associate some data with the client when inserting the client.
                 state
-                    .wzm
+                    .state
                     .display_handle
                     .insert_client(client_stream, Arc::new(ClientState::default()))
                     .unwrap();
@@ -159,7 +159,7 @@ impl Wzm {
                 |_, display, state| {
                     // Safety: we don't drop the display
                     unsafe {
-                        display.get_mut().dispatch_clients(&mut state.wzm).unwrap();
+                        display.get_mut().dispatch_clients(state).unwrap();
                     }
                     Ok(PostAction::Continue)
                 },

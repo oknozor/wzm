@@ -13,7 +13,7 @@ use smithay::utils::Rectangle;
 use tracing::info;
 
 use crate::decoration::{BorderShader, CustomRenderElements};
-use crate::{CalloopData, DisplayHandle, Wzm};
+use crate::{Wzm, DisplayHandle, State};
 
 pub struct Winit {
     output: Output,
@@ -23,7 +23,7 @@ pub struct Winit {
 
 impl Winit {
     pub fn new(
-        event_loop: LoopHandle<CalloopData>,
+        event_loop: LoopHandle<Wzm>,
         display_handle: DisplayHandle,
     ) -> Result<Self, winit::Error> {
         let builder = WindowBuilder::new()
@@ -66,9 +66,9 @@ impl Winit {
                     output.change_current_state(Some(mode), None, None, None);
                     output.set_preferred(mode);
                 }
-                WinitEvent::Input(event) => state.wzm.process_input_event(event),
+                WinitEvent::Input(event) => state.process_input_event(event),
                 WinitEvent::Focus(_) => (),
-                WinitEvent::Redraw => state.backend.render(&mut state.wzm),
+                WinitEvent::Redraw => state.backend.render(&mut state.state),
                 WinitEvent::CloseRequested => state.loop_signal.stop(),
             })
             .unwrap();
@@ -80,7 +80,7 @@ impl Winit {
         })
     }
 
-    pub fn render(&mut self, wzm: &mut Wzm) {
+    pub fn render(&mut self, wzm: &mut State) {
         let size = self.backend.window_size();
         let damage = Rectangle::from_loc_and_size((0, 0), size);
 

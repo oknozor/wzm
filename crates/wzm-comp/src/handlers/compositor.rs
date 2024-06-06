@@ -11,13 +11,13 @@ use smithay::{delegate_compositor, delegate_shm};
 
 use crate::grabs::resize_grab;
 use crate::state::ClientState;
-use crate::Wzm;
+use crate::{Wzm, State};
 
 use super::xdg_shell;
 
 impl CompositorHandler for Wzm {
     fn compositor_state(&mut self) -> &mut CompositorState {
-        &mut self.compositor_state
+        &mut self.state.compositor_state
     }
 
     fn client_compositor_state<'a>(&self, client: &'a Client) -> &'a CompositorClientState {
@@ -32,6 +32,7 @@ impl CompositorHandler for Wzm {
                 root = parent;
             }
             if let Some(window) = self
+                .state
                 .space
                 .elements()
                 .find(|w| w.toplevel().unwrap().wl_surface() == &root)
@@ -40,13 +41,13 @@ impl CompositorHandler for Wzm {
             }
         };
 
-        self.layer_shell_handle_commit(surface);
-        xdg_shell::handle_commit(&mut self.popups, &self.space, surface);
-        resize_grab::handle_commit(&mut self.space, surface);
+        self.state.layer_shell_handle_commit(surface);
+        xdg_shell::handle_commit(&mut self.state.popups, &self.state.space, surface);
+        resize_grab::handle_commit(&mut self.state.space, surface);
     }
 
     fn destroyed(&mut self, _: &WlSurface) {
-        let ws = self.get_current_workspace();
+        let ws = self.state.get_current_workspace();
         // ws.update_layout();
     }
 }
@@ -57,7 +58,7 @@ impl BufferHandler for Wzm {
 
 impl ShmHandler for Wzm {
     fn shm_state(&self) -> &ShmState {
-        &self.shm_state
+        &self.state.shm_state
     }
 }
 

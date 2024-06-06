@@ -9,11 +9,11 @@ use smithay::wayland::shell::wlr_layer::{
     WlrLayerShellState,
 };
 
-use crate::Wzm;
+use crate::{Wzm, State};
 
 impl WlrLayerShellHandler for Wzm {
     fn shell_state(&mut self) -> &mut WlrLayerShellState {
-        &mut self.layer_shell_state
+        &mut self.state.layer_shell_state
     }
 
     fn new_layer_surface(
@@ -26,14 +26,14 @@ impl WlrLayerShellHandler for Wzm {
         let output = wl_output
             .as_ref()
             .and_then(Output::from_resource)
-            .unwrap_or_else(|| self.space.outputs().next().unwrap().clone());
+            .unwrap_or_else(|| self.state.space.outputs().next().unwrap().clone());
         let mut map = layer_map_for_output(&output);
         map.map_layer(&LayerSurface::new(surface, namespace))
             .unwrap();
     }
 
     fn layer_destroyed(&mut self, surface: WlrLayerSurface) {
-        if let Some((mut map, layer)) = self.space.outputs().find_map(|o| {
+        if let Some((mut map, layer)) = self.state.space.outputs().find_map(|o| {
             let map = layer_map_for_output(o);
             let layer = map
                 .layers()
@@ -47,7 +47,7 @@ impl WlrLayerShellHandler for Wzm {
 }
 delegate_layer_shell!(Wzm);
 
-impl Wzm {
+impl State {
     pub fn layer_shell_handle_commit(&mut self, surface: &WlSurface) {
         if let Some(output) = self.space.outputs().find(|op| {
             let map = layer_map_for_output(op);

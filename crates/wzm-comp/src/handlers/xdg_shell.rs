@@ -16,28 +16,28 @@ use smithay::wayland::shell::xdg::{
 
 use crate::grabs::{MoveSurfaceGrab, ResizeSurfaceGrab};
 use crate::input::check_grab;
-use crate::Wzm;
+use crate::{Wzm, State};
 
 impl XdgShellHandler for Wzm {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
-        &mut self.xdg_shell_state
+        &mut self.state.xdg_shell_state
     }
 
     fn new_toplevel(&mut self, surface: ToplevelSurface) {
-        let workspace = self.get_current_workspace();
+        let workspace = self.state.get_current_workspace();
         let mut workspace = workspace.borrow_mut();
         let window = Window::new_wayland_window(surface.clone());
 
-        let next_layout = self.next_layout;
+        let next_layout = self.state.next_layout;
 
         match next_layout {
             Some(next_layout) => workspace.split_insert(window, next_layout),
             None => workspace.insert(window),
         }
 
-        self.next_layout = None;
+        self.state.next_layout = None;
 
-        let handle = self
+        let handle = self.state
             .seat
             .get_keyboard()
             .expect("Should have a keyboard seat");
@@ -47,8 +47,8 @@ impl XdgShellHandler for Wzm {
     }
 
     fn new_popup(&mut self, surface: PopupSurface, _positioner: PositionerState) {
-        self.unconstrain_popup(&surface);
-        let _ = self.popups.track_popup(PopupKind::Xdg(surface));
+        self.state.unconstrain_popup(&surface);
+        let _ = self.state.popups.track_popup(PopupKind::Xdg(surface));
     }
 
     fn move_request(&mut self, surface: ToplevelSurface, seat: wl_seat::WlSeat, serial: Serial) {
@@ -59,12 +59,13 @@ impl XdgShellHandler for Wzm {
             let pointer = seat.get_pointer().unwrap();
 
             let window = self
+                .state
                 .space
                 .elements()
                 .find(|w| w.toplevel().unwrap().wl_surface() == wl_surface)
                 .unwrap()
                 .clone();
-            let initial_window_location = self.space.element_location(&window).unwrap();
+            let initial_window_location = self.state.space.element_location(&window).unwrap();
 
             let grab = MoveSurfaceGrab {
                 start_data,
@@ -91,12 +92,13 @@ impl XdgShellHandler for Wzm {
             let pointer = seat.get_pointer().unwrap();
 
             let window = self
+                .state
                 .space
                 .elements()
                 .find(|w| w.toplevel().unwrap().wl_surface() == wl_surface)
                 .unwrap()
                 .clone();
-            let initial_window_location = self.space.element_location(&window).unwrap();
+            let initial_window_location = self.state.space.element_location(&window).unwrap();
             let initial_window_size = window.geometry().size;
 
             surface.with_pending_state(|state| {
@@ -131,7 +133,7 @@ impl XdgShellHandler for Wzm {
             state.geometry = geometry;
             state.positioner = positioner;
         });
-        self.unconstrain_popup(&surface);
+        self.state.unconstrain_popup(&surface);
         surface.send_repositioned(token);
     }
 }
@@ -188,7 +190,7 @@ pub fn handle_commit(popups: &mut PopupManager, space: &Space<Window>, surface: 
     }
 }
 
-impl Wzm {
+impl State {
     pub(crate) fn unconstrain_popup(&self, popup: &PopupSurface) {
         let Ok(root) = find_popup_root_surface(&PopupKind::Xdg(popup.clone())) else {
             return;
