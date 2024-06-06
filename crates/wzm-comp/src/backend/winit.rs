@@ -1,8 +1,9 @@
 use std::time::Duration;
+use smithay::backend::egl::EGLDevice;
 
 use smithay::backend::renderer::damage::OutputDamageTracker;
 use smithay::backend::renderer::gles::GlesRenderer;
-use smithay::backend::renderer::ImportEgl;
+use smithay::backend::renderer::{ImportDma, ImportEgl};
 use smithay::backend::winit;
 use smithay::backend::winit::{WinitEvent, WinitGraphicsBackend};
 use smithay::output::{Mode, Output, PhysicalProperties, Subpixel};
@@ -10,7 +11,8 @@ use smithay::reexports::calloop::LoopHandle;
 use smithay::reexports::winit::dpi::LogicalSize;
 use smithay::reexports::winit::window::WindowBuilder;
 use smithay::utils::Rectangle;
-use tracing::info;
+use smithay::wayland::dmabuf::{DmabufFeedback, DmabufFeedbackBuilder, DmabufGlobal, DmabufState};
+use tracing::{info, warn};
 
 use crate::decoration::{BorderShader, CustomRenderElements};
 use crate::{Wzm, DisplayHandle, State};
@@ -19,6 +21,7 @@ pub struct Winit {
     output: Output,
     backend: WinitGraphicsBackend<GlesRenderer>,
     damage_tracker: OutputDamageTracker,
+    pub dmabuf_state: (DmabufState, DmabufGlobal, Option<DmabufFeedback>),
 }
 
 impl Winit {
@@ -56,6 +59,9 @@ impl Winit {
         let _global = output.create_global::<Wzm>(&display_handle);
         output.change_current_state(Some(mode), None, None, None);
         output.set_preferred(mode);
+
+        let dmabuf_state = Self::init_dmabuf_state(&display_handle, &mut backend);
+
         let damage_tracker = OutputDamageTracker::from_output(&output);
 
         event_loop
@@ -77,7 +83,49 @@ impl Winit {
             output,
             backend,
             damage_tracker,
+            dmabuf_state,
         })
+    }
+
+    fn init_dmabuf_state(display_handle: &DisplayHandle, mut backend: &mut WinitGraphicsBackend<GlesRenderer>) -> (DmabufState, DmabufGlobal, Option<DmabufFeedback>) {
+        let render_node = EGLDevice::device_for_display(backend.renderer().egl_context().display())
+            .and_then(|device| device.try_get_render_node());
+
+        let dmabuf_default_feedback = match render_node {
+            Ok(Some(node)) => {
+                let dmabuf_formats = backend.renderer().dmabuf_formats().collect::<Vec<_>>();
+                let dmabuf_default_feedback = DmabufFeedbackBuilder::new(node.dev_id(), dmabuf_formats)
+                    .build()
+                    .unwrap();
+                Some(dmabuf_default_feedback)
+            }
+            Ok(None) => {
+                warn!("failed to query render node, dmabuf will use v3");
+                None
+            }
+            Err(err) => {
+                warn!(?err, "failed to egl device for display, dmabuf will use v3");
+                None
+            }
+        };
+
+        // if we failed to build dmabuf feedback we fall back to dmabuf v3
+        // Note: egl on Mesa requires either v4 or wl_drm (initialized with bind_wl_display)
+        let dmabuf_state = if let Some(default_feedback) = dmabuf_default_feedback {
+            let mut dmabuf_state = DmabufState::new();
+            let dmabuf_global = dmabuf_state.create_global_with_default_feedback::<Wzm>(
+                display_handle,
+                &default_feedback,
+            );
+            (dmabuf_state, dmabuf_global, Some(default_feedback))
+        } else {
+            let dmabuf_formats = backend.renderer().dmabuf_formats().collect::<Vec<_>>();
+            let mut dmabuf_state = DmabufState::new();
+            let dmabuf_global =
+                dmabuf_state.create_global::<Wzm>(display_handle, dmabuf_formats);
+            (dmabuf_state, dmabuf_global, None)
+        };
+        dmabuf_state
     }
 
     pub fn render(&mut self, wzm: &mut State) {
