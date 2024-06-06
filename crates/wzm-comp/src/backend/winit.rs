@@ -1,5 +1,5 @@
-use std::time::Duration;
 use smithay::backend::egl::EGLDevice;
+use std::time::Duration;
 
 use smithay::backend::renderer::damage::OutputDamageTracker;
 use smithay::backend::renderer::gles::GlesRenderer;
@@ -15,7 +15,7 @@ use smithay::wayland::dmabuf::{DmabufFeedback, DmabufFeedbackBuilder, DmabufGlob
 use tracing::{info, warn};
 
 use crate::decoration::{BorderShader, CustomRenderElements};
-use crate::{Wzm, DisplayHandle, State};
+use crate::{DisplayHandle, State, Wzm};
 
 pub struct Winit {
     output: Output,
@@ -87,16 +87,20 @@ impl Winit {
         })
     }
 
-    fn init_dmabuf_state(display_handle: &DisplayHandle, mut backend: &mut WinitGraphicsBackend<GlesRenderer>) -> (DmabufState, DmabufGlobal, Option<DmabufFeedback>) {
+    fn init_dmabuf_state(
+        display_handle: &DisplayHandle,
+        backend: &mut WinitGraphicsBackend<GlesRenderer>,
+    ) -> (DmabufState, DmabufGlobal, Option<DmabufFeedback>) {
         let render_node = EGLDevice::device_for_display(backend.renderer().egl_context().display())
             .and_then(|device| device.try_get_render_node());
 
         let dmabuf_default_feedback = match render_node {
             Ok(Some(node)) => {
                 let dmabuf_formats = backend.renderer().dmabuf_formats().collect::<Vec<_>>();
-                let dmabuf_default_feedback = DmabufFeedbackBuilder::new(node.dev_id(), dmabuf_formats)
-                    .build()
-                    .unwrap();
+                let dmabuf_default_feedback =
+                    DmabufFeedbackBuilder::new(node.dev_id(), dmabuf_formats)
+                        .build()
+                        .unwrap();
                 Some(dmabuf_default_feedback)
             }
             Ok(None) => {
@@ -113,16 +117,13 @@ impl Winit {
         // Note: egl on Mesa requires either v4 or wl_drm (initialized with bind_wl_display)
         let dmabuf_state = if let Some(default_feedback) = dmabuf_default_feedback {
             let mut dmabuf_state = DmabufState::new();
-            let dmabuf_global = dmabuf_state.create_global_with_default_feedback::<Wzm>(
-                display_handle,
-                &default_feedback,
-            );
+            let dmabuf_global = dmabuf_state
+                .create_global_with_default_feedback::<Wzm>(display_handle, &default_feedback);
             (dmabuf_state, dmabuf_global, Some(default_feedback))
         } else {
             let dmabuf_formats = backend.renderer().dmabuf_formats().collect::<Vec<_>>();
             let mut dmabuf_state = DmabufState::new();
-            let dmabuf_global =
-                dmabuf_state.create_global::<Wzm>(display_handle, dmabuf_formats);
+            let dmabuf_global = dmabuf_state.create_global::<Wzm>(display_handle, dmabuf_formats);
             (dmabuf_state, dmabuf_global, None)
         };
         dmabuf_state

@@ -2,7 +2,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use wzm_comp::backend::winit::Winit;
 use wzm_comp::backend::Backend;
-use wzm_comp::{Wzm, Display, EventLoop, State};
+use wzm_comp::{Display, EventLoop, State, Wzm};
 use wzm_config::WzmConfig;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,7 +43,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     toplevel.send_configure();
                 }
 
-                state.state.space.map_element(window, geometry.loc, activate);
+                state
+                    .state
+                    .space
+                    .map_element(window, geometry.loc, activate);
             }
         })
         .unwrap();

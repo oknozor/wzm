@@ -8,7 +8,7 @@ use smithay::input::pointer::{
 use smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
 use smithay::utils::{Logical, Point};
 
-use crate::{Wzm};
+use crate::Wzm;
 
 pub struct MoveSurfaceGrab {
     pub start_data: PointerGrabStartData<Wzm>,

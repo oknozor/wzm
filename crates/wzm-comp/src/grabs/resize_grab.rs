@@ -1,4 +1,4 @@
-use crate::{Wzm};
+use crate::Wzm;
 use smithay::desktop::{Space, Window};
 use smithay::input::pointer::{
     AxisFrame, ButtonEvent, GestureHoldBeginEvent, GestureHoldEndEvent, GesturePinchBeginEvent,

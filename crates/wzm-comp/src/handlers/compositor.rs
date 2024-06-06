@@ -11,7 +11,7 @@ use smithay::{delegate_compositor, delegate_shm};
 
 use crate::grabs::resize_grab;
 use crate::state::ClientState;
-use crate::{Wzm, State};
+use crate::Wzm;
 
 use super::xdg_shell;
 

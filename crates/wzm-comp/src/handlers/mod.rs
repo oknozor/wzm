@@ -10,11 +10,13 @@ use smithay::wayland::selection::SelectionHandler;
 use smithay::wayland::xdg_foreign::{XdgForeignHandler, XdgForeignState};
 use smithay::{delegate_data_device, delegate_output, delegate_seat, delegate_xdg_foreign};
 
-use crate::{Wzm, State};
+use crate::Wzm;
 
 mod activation;
 mod compositor;
 mod decoration;
+mod dmabuf;
+mod drm;
 mod layer_shell;
 mod xdg_shell;
 //

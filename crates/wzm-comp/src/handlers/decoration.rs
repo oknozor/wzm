@@ -3,7 +3,7 @@ use smithay::reexports::wayland_protocols::xdg::decoration::zv1::server::zxdg_to
 use smithay::wayland::shell::xdg::decoration::XdgDecorationHandler;
 use smithay::wayland::shell::xdg::ToplevelSurface;
 
-use crate::{Wzm, State};
+use crate::Wzm;
 
 impl XdgDecorationHandler for Wzm {
     fn new_decoration(&mut self, toplevel: ToplevelSurface) {

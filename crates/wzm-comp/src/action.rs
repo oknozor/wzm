@@ -14,7 +14,7 @@ use wzm_config::action::Direction;
 use wzm_config::keybinding::{Mode, ResizeDirection, ResizeType};
 
 use crate::shell::{Orientation, Tree};
-use crate::{Wzm, State};
+use crate::Wzm;
 
 impl Wzm {
     pub fn set_layout_h(&mut self) {
@@ -74,7 +74,8 @@ impl Wzm {
     ) -> Option<Window> {
         let mut window = None;
         if let Some(focus) = ws.get_focus() {
-            let loc = self.state
+            let loc = self
+                .state
                 .space
                 .element_location(&focus)
                 .expect("window should have a location");
@@ -103,7 +104,8 @@ impl Wzm {
                 direction.advance_point(&mut point);
 
                 window = {
-                    self.state.space
+                    self.state
+                        .space
                         .element_under(point)
                         .map(|(window, _)| window.clone())
                 };
@@ -122,7 +124,8 @@ impl Wzm {
         tree.remove();
 
         if let Some(window) = tree.get_focus() {
-            let handle = self.state
+            let handle = self
+                .state
                 .seat
                 .get_keyboard()
                 .expect("Should have a keyboard seat");

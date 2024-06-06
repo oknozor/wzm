@@ -32,6 +32,19 @@ the eventloop. Note that upon starting, we will need to get the device list once
 Udev event can be one of "change", "added" or "removed", each one holds a device id and the added event
 has a path to the device file descriptor. 
 
+**06/06/2024**
+
+I started to integrate udev this morning. The first task was to implement all smithay handlers on `CallLoopData` instead
+of `Wzm` to access the backend state in dmabuf and drm lease handlers. These are now respectivly named `Wzm` (former calloopdata)
+and `State` (former `Wzm`).
+
+After that I added the `DrmLeaseHandler` and `DmabufHandler`, I have a very high level understanding of those now and I should 
+probably dig a bit more to understand what's going on under the hood. 
+
+It's worth to note that my current implementation select the backend in use via the `Backend` enum, 
+which mean that for certain handler (such as `DrmLeaseHandler`), there will be unreachable code for the winit backend. 
+
+All the necessary handler are now ready for the next step: implementing the udev run function. 
 
 ## Glossary
 

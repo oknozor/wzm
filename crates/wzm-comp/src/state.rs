@@ -59,11 +59,7 @@ pub struct State {
 }
 
 impl State {
-    pub fn new(
-        event_loop: LoopHandle<Wzm>,
-        display: Display<Wzm>,
-        output: &Output,
-    ) -> Self {
+    pub fn new(event_loop: LoopHandle<Wzm>, display: Display<Wzm>, output: &Output) -> Self {
         let start_time = std::time::Instant::now();
 
         let dh = display.handle();
@@ -128,10 +124,7 @@ impl State {
         }
     }
 
-    fn init_wayland_listener(
-        display: Display<Wzm>,
-        event_loop: LoopHandle<Wzm>,
-    ) -> OsString {
+    fn init_wayland_listener(display: Display<Wzm>, event_loop: LoopHandle<Wzm>) -> OsString {
         // Creates a new listening socket, automatically choosing the next available `wayland` socket name.
         let listening_socket = ListeningSocketSource::new_auto().unwrap();
 

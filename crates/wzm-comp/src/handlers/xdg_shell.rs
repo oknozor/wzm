@@ -16,7 +16,7 @@ use smithay::wayland::shell::xdg::{
 
 use crate::grabs::{MoveSurfaceGrab, ResizeSurfaceGrab};
 use crate::input::check_grab;
-use crate::{Wzm, State};
+use crate::{State, Wzm};
 
 impl XdgShellHandler for Wzm {
     fn xdg_shell_state(&mut self) -> &mut XdgShellState {
@@ -37,7 +37,8 @@ impl XdgShellHandler for Wzm {
 
         self.state.next_layout = None;
 
-        let handle = self.state
+        let handle = self
+            .state
             .seat
             .get_keyboard()
             .expect("Should have a keyboard seat");

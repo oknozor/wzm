@@ -17,8 +17,8 @@ use wzm_config::keybinding;
 use wzm_config::keybinding::Action;
 
 use crate::action::spawn;
-use crate::Wzm;
 use crate::state::State;
+use crate::Wzm;
 
 impl Wzm {
     pub fn process_input_event<I: InputBackend>(&mut self, event: InputEvent<I>) {
@@ -141,11 +141,19 @@ impl Wzm {
                         }
                         KeyState::Pressed if modifiers.alt => {
                             app_state.state.mod_pressed = true;
-                            Self::key_pressed_to_action(&mut app_state.state, modifiers, keysym, mode)
+                            Self::key_pressed_to_action(
+                                &mut app_state.state,
+                                modifiers,
+                                keysym,
+                                mode,
+                            )
                         }
-                        KeyState::Pressed => {
-                            Self::key_pressed_to_action(&mut app_state.state, modifiers, keysym, mode)
-                        }
+                        KeyState::Pressed => Self::key_pressed_to_action(
+                            &mut app_state.state,
+                            modifiers,
+                            keysym,
+                            mode,
+                        ),
                         _ => FilterResult::Forward,
                     }
                 },

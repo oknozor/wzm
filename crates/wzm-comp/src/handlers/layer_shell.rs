@@ -9,7 +9,7 @@ use smithay::wayland::shell::wlr_layer::{
     WlrLayerShellState,
 };
 
-use crate::{Wzm, State};
+use crate::{State, Wzm};
 
 impl WlrLayerShellHandler for Wzm {
     fn shell_state(&mut self) -> &mut WlrLayerShellState {
